@@ -1,0 +1,5 @@
+Paint.Tes is distributed under GPL-3.0-or-later.
+ComfyUI is included as a pinned Git submodule under its own GPL-3.0 license.
+ComfyUI copyright and attribution remain in engine/ComfyUI.
+The native Qt editor and workflow adapter are new Paint.Tes code.
+No Paint.NET assets or source code are included.
