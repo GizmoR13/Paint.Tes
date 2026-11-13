@@ -4,6 +4,8 @@ import csv
 import io
 import subprocess
 
+from .i18n import tr
+
 
 def list_gpus() -> list[dict]:
     try:
@@ -31,19 +33,19 @@ def require_volta():
     import torch
 
     if not os.environ.get("CUDA_VISIBLE_DEVICES", "").startswith("GPU-"):
-        raise RuntimeError("Wybierz V100 według UUID w ustawieniach Paint.Tes.")
+        raise RuntimeError(tr("Wybierz V100 według UUID w ustawieniach Paint.TES."))
     if not torch.cuda.is_available() or torch.version.hip:
-        raise RuntimeError("Brak dostępnej karty NVIDIA CUDA.")
+        raise RuntimeError(tr("Brak dostępnej karty NVIDIA CUDA."))
     if torch.cuda.device_count() != 1 or torch.cuda.get_device_capability() != (7, 0):
         raise RuntimeError(
-            "Paint.Tes obsługuje V100/V100S/TITAN V (Volta sm_70), jedną kartę na zadanie."
+            tr("Paint.TES obsługuje V100/V100S/TITAN V (Volta sm_70), jedną kartę na zadanie.")
         )
     if (
         not torch.version.cuda
         or int(torch.version.cuda.split(".")[0]) != 12
         or "sm_70" not in torch.cuda.get_arch_list()
     ):
-        raise RuntimeError("Środowisko wymaga PyTorch CUDA 12.x z obsługą sm_70.")
+        raise RuntimeError(tr("Środowisko wymaga PyTorch CUDA 12.x z obsługą sm_70."))
     torch.backends.cuda.enable_flash_sdp(False)
     torch.backends.cuda.enable_mem_efficient_sdp(False)
     torch.backends.cuda.enable_math_sdp(True)

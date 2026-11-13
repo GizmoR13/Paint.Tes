@@ -9,39 +9,50 @@ import time
 from pathlib import Path
 
 from PIL import Image, ImageOps, PngImagePlugin
-from PySide6.QtCore import Qt, QThread, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QActionGroup, QColor, QDesktopServices, QKeySequence
+from PySide6.QtCore import QLocale, QRegularExpression, QSize, Qt, QThread, QTimer, QUrl, Signal
+from PySide6.QtGui import (
+    QAction,
+    QActionGroup,
+    QColor,
+    QDesktopServices,
+    QKeySequence,
+    QRegularExpressionValidator,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QColorDialog,
     QComboBox,
     QDialog,
     QDockWidget,
-    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QStackedWidget,
     QTabWidget,
     QToolBar,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from .canvas import Canvas
 from .config import Settings, data_path
-from .dialogs import NewImageDialog, OutpaintDialog, SettingsDialog, spin
+from .dialogs import DecimalSpinBox, NewImageDialog, OutpaintDialog, SettingsDialog, spin
 from .document import Document
 from .engine import Cancelled, EngineClient
 from .hardware import list_gpus
+from .i18n import apply_qt_language, retranslate_widgets, set_language, tr
+from .icons import icon
 from .imageops import expand_canvas, load_image, paint_mask, validate_size
 from .workflow import Generation
 
@@ -78,7 +89,7 @@ class Job(QThread):
     def run(self):
         try:
             if self.cancelled:
-                raise Cancelled("Anulowano.")
+                raise Cancelled(tr("Anulowano."))
             if self.background:
                 result = self.run_background()
                 metadata = {"operation": "background-remove"}
@@ -98,31 +109,34 @@ class Job(QThread):
                     "seed": str(self.request.seed),
                     "steps": str(self.request.steps),
                     "cfg": str(self.request.cfg),
+                    "denoise": str(
+                        1.0 if self.request.mode == "txt2img" else self.request.strength
+                    ),
                     "mode": self.request.mode,
                     "profile": self.profile.name,
                 }
             if self.cancelled:
-                raise Cancelled("Anulowano.")
+                raise Cancelled(tr("Anulowano."))
             self.success.emit(result, self.title, metadata)
         except Cancelled:
-            self.status.emit("Anulowano. Obrazy źródłowe pozostały w kartach.")
+            self.status.emit(tr("Anulowano. Obrazy źródłowe pozostały w kartach."))
         except Exception as error:
             if self.cancelled:
-                self.status.emit("Anulowano.")
+                self.status.emit(tr("Anulowano."))
             else:
                 self.failure.emit(str(error))
 
     def run_background(self):
         model = Path(self.settings.background_model)
         if not self.settings.background_model or not model.is_file():
-            raise ValueError("W Ustawienia → Usuwanie tła wybierz lokalny model ONNX.")
+            raise ValueError(tr("W Ustawienia → Usuwanie tła wybierz lokalny model ONNX."))
         gpus = list_gpus()
         gpu = self.settings.gpu_uuid or (gpus[0]["uuid"] if gpus else "")
         if not gpu:
-            raise ValueError("Nie znaleziono zgodnej V100/V100S/TITAN V.")
+            raise ValueError(tr("Nie znaleziono zgodnej V100/V100S/TITAN V."))
         temp = data_path() / "jobs"
         temp.mkdir(parents=True, exist_ok=True)
-        self.status.emit("Usuwanie tła z użyciem lokalnego modelu ONNX…")
+        self.status.emit(tr("Usuwanie tła z użyciem lokalnego modelu ONNX…"))
         with tempfile.TemporaryDirectory(dir=temp) as directory:
             source = Path(directory) / "source.png"
             target = Path(directory) / "result.png"
@@ -168,11 +182,14 @@ class MainWindow(QMainWindow):
     def __init__(self, settings: Settings | None = None):
         super().__init__()
         self.settings = settings or Settings.load()
+        set_language(self.settings.language)
+        apply_qt_language()
+        self.last_seed = None
         self.client = EngineClient()
         self.job = None
         self._closing = False
         self.started = 0
-        self.setWindowTitle("Paint.Tes • lokalne studio obrazu")
+        self.setWindowTitle(tr("Paint.TES • lokalne studio obrazu"))
         self.resize(1440, 900)
         self.setMinimumSize(1000, 680)
         self.stack = QStackedWidget()
@@ -186,18 +203,18 @@ class MainWindow(QMainWindow):
         welcome = QWidget()
         wl = QVBoxLayout(welcome)
         wl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        brand = QLabel("Paint.Tes")
+        brand = QLabel("Paint.TES")
         brand.setObjectName("brand")
         brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
         wl.addWidget(brand)
-        text = QLabel("Twoje obrazy. Twoje modele. Lokalna V100.")
+        text = QLabel(tr("Twoje obrazy. Twoje modele. Lokalna V100."))
         text.setObjectName("muted")
         text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         wl.addWidget(text)
         for label, slot in (
-            ("Nowy obraz…", self.new_image),
-            ("Otwórz obrazy…", self.open_images),
-            ("Ustaw modele lokalne…", self.open_settings),
+            (tr("Nowy obraz…"), self.new_image),
+            (tr("Otwórz obrazy…"), self.open_images),
+            (tr("Ustaw modele lokalne…"), self.open_settings),
         ):
             button = QPushButton(label)
             button.clicked.connect(slot)
@@ -207,7 +224,7 @@ class MainWindow(QMainWindow):
         self.build_menus()
         self.build_tools()
         self.build_ai()
-        self.status_label = QLabel("Gotowy • silnik AI uruchamia się dopiero przy generowaniu")
+        self.status_label = QLabel(tr("Gotowy • silnik AI uruchamia się dopiero przy generowaniu"))
         self.statusBar().addWidget(self.status_label, 1)
         self.coords = QLabel("")
         self.statusBar().addPermanentWidget(self.coords)
@@ -226,104 +243,125 @@ class MainWindow(QMainWindow):
         return action
 
     def build_menus(self):
-        file = self.menuBar().addMenu("Plik")
-        self.action("Nowy obraz…", self.new_image, QKeySequence.StandardKey.New, file)
-        self.action("Otwórz…", self.open_images, QKeySequence.StandardKey.Open, file)
+        file = self.menuBar().addMenu(tr("Plik"))
+        self.action(tr("Nowy obraz…"), self.new_image, QKeySequence.StandardKey.New, file)
+        self.action(tr("Otwórz…"), self.open_images, QKeySequence.StandardKey.Open, file)
         file.addSeparator()
-        self.action("Zapisz", self.save_image, QKeySequence.StandardKey.Save, file)
-        self.action("Zapisz jako…", lambda: self.save_image(save_as=True), "Ctrl+Shift+S", file)
+        self.action(tr("Zapisz"), self.save_image, QKeySequence.StandardKey.Save, file)
+        self.action(tr("Zapisz jako…"), lambda: self.save_image(save_as=True), "Ctrl+Shift+S", file)
         file.addSeparator()
         self.action(
-            "Zamknij kartę", lambda: self.close_tab(self.tabs.currentIndex()), "Ctrl+W", file
+            tr("Zamknij kartę"), lambda: self.close_tab(self.tabs.currentIndex()), "Ctrl+W", file
         )
-        self.action("Zakończ", self.close, "Ctrl+Q", file)
-        edit = self.menuBar().addMenu("Edycja")
-        self.undo_action = self.action("Cofnij", self.undo, QKeySequence.StandardKey.Undo, edit)
-        self.redo_action = self.action("Ponów", self.redo, QKeySequence.StandardKey.Redo, edit)
+        self.action(tr("Zakończ"), self.close, "Ctrl+Q", file)
+        edit = self.menuBar().addMenu(tr("Edycja"))
+        self.undo_action = self.action(tr("Cofnij"), self.undo, QKeySequence.StandardKey.Undo, edit)
+        self.redo_action = self.action(tr("Ponów"), self.redo, QKeySequence.StandardKey.Redo, edit)
         edit.addSeparator()
-        self.action("Kopiuj obraz", self.copy_image, QKeySequence.StandardKey.Copy, edit)
-        self.action("Wklej jako nową kartę", self.paste_image, QKeySequence.StandardKey.Paste, edit)
-        self.action("Wyczyść zaznaczenie", self.delete_selection, "Delete", edit)
-        self.action("Ustawienia…", self.open_settings, "Ctrl+,", edit)
-        selection = self.menuBar().addMenu("Zaznaczenie")
-        self.action("Zaznacz wszystko", self.select_all, "Ctrl+A", selection)
-        self.action("Usuń zaznaczenie", self.clear_selection, "Ctrl+D", selection)
-        self.action("Odwróć zaznaczenie", self.invert_selection, "Ctrl+I", selection)
-        self.action("Zmiękcz krawędzie…", self.feather_selection, None, selection)
-        self.action("Przytnij do zaznaczenia", self.crop_selection, None, selection)
-        image = self.menuBar().addMenu("Obraz")
-        self.action("Zmień rozmiar…", self.resize_image, None, image)
+        self.action(tr("Kopiuj obraz"), self.copy_image, QKeySequence.StandardKey.Copy, edit)
         self.action(
-            "Obróć w prawo",
+            tr("Wklej jako nową kartę"), self.paste_image, QKeySequence.StandardKey.Paste, edit
+        )
+        self.action(tr("Wyczyść zaznaczenie"), self.delete_selection, "Delete", edit)
+        self.action(tr("Ustawienia…"), self.open_settings, "Ctrl+,", edit)
+        selection = self.menuBar().addMenu(tr("Zaznaczenie"))
+        self.action(tr("Zaznacz wszystko"), self.select_all, "Ctrl+A", selection)
+        self.action(tr("Usuń zaznaczenie"), self.clear_selection, "Ctrl+D", selection)
+        self.action(tr("Odwróć zaznaczenie"), self.invert_selection, "Ctrl+I", selection)
+        self.action(tr("Zmiękcz krawędzie…"), self.feather_selection, None, selection)
+        self.action(tr("Przytnij do zaznaczenia"), self.crop_selection, None, selection)
+        image = self.menuBar().addMenu(tr("Obraz"))
+        self.action(tr("Zmień rozmiar…"), self.resize_image, None, image)
+        self.action(
+            tr("Obróć w prawo"),
             lambda: self.transform_image(lambda im: im.transpose(Image.Transpose.ROTATE_270)),
             None,
             image,
         )
-        self.action("Odbij poziomo", lambda: self.transform_image(ImageOps.mirror), None, image)
-        self.action("Użyj jako referencji", self.use_reference, None, image)
+        self.action(tr("Odbij poziomo"), lambda: self.transform_image(ImageOps.mirror), None, image)
+        self.action(tr("Użyj jako referencji"), self.use_reference, None, image)
         ai = self.menuBar().addMenu("AI")
-        self.action("Generuj", self.generate, "Ctrl+Return", ai)
-        self.action("Usuń tło", self.remove_background, None, ai)
-        self.action("Zwolnij pamięć silnika", self.release_engine, None, ai)
-        view = self.menuBar().addMenu("Widok")
-        self.action("Dopasuj do okna", self.fit_canvas, "Ctrl+0", view)
-        self.action("Rozmiar rzeczywisty", self.actual_size, "Ctrl+1", view)
-        help_menu = self.menuBar().addMenu("Pomoc")
-        self.action("Instrukcja", self.help, None, help_menu)
+        self.action(tr("Generuj"), self.generate, "Ctrl+Return", ai)
+        self.action(tr("Usuń tło"), self.remove_background, None, ai)
+        self.action(tr("Zwolnij pamięć silnika"), self.release_engine, None, ai)
+        view = self.menuBar().addMenu(tr("Widok"))
+        self.action(tr("Dopasuj do okna"), self.fit_canvas, "Ctrl+0", view)
+        self.action(tr("Rozmiar rzeczywisty"), self.actual_size, "Ctrl+1", view)
+        help_menu = self.menuBar().addMenu(tr("Pomoc"))
+        self.action(tr("Instrukcja"), self.help, None, help_menu)
         self.action(
-            "O Paint.Tes",
+            tr("O Paint.TES"),
             lambda: QMessageBox.information(
                 self,
-                "Paint.Tes",
-                "Paint.Tes 0.1.0\nNatywny edytor dla Ubuntu i kart NVIDIA Volta.\nLokalne modele • prywatne repozytorium\nGPL-3.0-or-later. Silnik: ComfyUI (GPL-3.0).",
+                "Paint.TES",
+                tr(
+                    "Paint.TES 0.2.0\nNatywny edytor dla Ubuntu i kart NVIDIA Volta.\nLokalne modele • prywatne repozytorium\nGPL-3.0-or-later. Silnik: ComfyUI (GPL-3.0)."
+                ),
             ),
             None,
             help_menu,
         )
 
     def build_tools(self):
-        top = QToolBar("Plik i widok")
+        top = QToolBar(tr("Plik i widok"))
+        self.top_toolbar = top
         top.setMovable(False)
+        top.setIconSize(QSize(24, 24))
+        top.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        top.setFixedHeight(56)
         self.addToolBar(top)
-        for text, slot in (
-            ("Nowy", self.new_image),
-            ("Otwórz", self.open_images),
-            ("Zapisz", self.save_image),
-            ("Cofnij", self.undo),
-            ("Ponów", self.redo),
-            ("Dopasuj", self.fit_canvas),
-            ("100%", self.actual_size),
+        self.top_actions = {}
+        for key, label, slot, shortcut in (
+            ("new", "Nowy", self.new_image, "Ctrl+N"),
+            ("open", "Otwórz", self.open_images, "Ctrl+O"),
+            ("save", "Zapisz", self.save_image, "Ctrl+S"),
+            ("undo", "Cofnij", self.undo, "Ctrl+Z"),
+            ("redo", "Ponów", self.redo, "Ctrl+Shift+Z"),
+            ("fit", "Dopasuj do okna", self.fit_canvas, "Ctrl+0"),
+            ("actual", "Rozmiar rzeczywisty", self.actual_size, "Ctrl+1"),
+            ("settings", "Ustawienia", self.open_settings, "Ctrl+,"),
         ):
-            top.addAction(self.action(text, slot))
+            action = self.action(tr(label), slot)
+            action.setIcon(icon(key))
+            action.setToolTip(tr(label) + " (" + shortcut + ")")
+            top.addAction(action)
+            self.top_actions[key] = action
         top.addSeparator()
-        top.addAction(self.action("Ustawienia", self.open_settings))
         self.brush_size = spin(16, 1, 500, 1)
-        self.brush_size.setPrefix("Pędzel: ")
+        self.brush_size.setPrefix(tr("Pędzel: "))
         self.brush_size.setSuffix(" px")
         top.addWidget(self.brush_size)
-        self.color_button = QPushButton("Kolor")
+        self.color_button = QToolButton()
+        self.color_button.setIcon(icon("color"))
+        self.color_button.setIconSize(QSize(24, 24))
+        self.color_button.setToolTip(tr("Kolor pędzla"))
+        self.color_button.setAccessibleName(tr("Kolor pędzla"))
         self.color_button.clicked.connect(self.choose_color)
         top.addWidget(self.color_button)
         self.brush_color = (97, 59, 31, 255)
         self.brush_size.valueChanged.connect(self.update_brush)
-        tools = QToolBar("Narzędzia")
+        tools = QToolBar(tr("Narzędzia"))
+        self.tools_toolbar = tools
         tools.setMovable(False)
-        tools.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        tools.setIconSize(QSize(24, 24))
+        tools.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        tools.setFixedWidth(58)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, tools)
         self.tool_group = QActionGroup(self)
         self.tool_actions = {}
         for key, label, shortcut in (
-            ("hand", "↔  Przesuń", "H"),
-            ("rectangle", "▣  Prostokąt", "S"),
-            ("ellipse", "◯  Elipsa", "E"),
-            ("lasso", "⌁  Lasso", "L"),
-            ("polygon", "⬠  Wielokąt", "P"),
-            ("brush", "✎  Pędzel", "B"),
-            ("eraser", "▱  Gumka", "R"),
+            ("hand", "Przesuń", "H"),
+            ("rectangle", "Prostokąt", "S"),
+            ("ellipse", "Elipsa", "E"),
+            ("lasso", "Lasso", "L"),
+            ("polygon", "Wielokąt", "P"),
+            ("brush", "Pędzel", "B"),
+            ("eraser", "Gumka", "R"),
         ):
-            action = QAction(label, self)
+            action = QAction(tr(label), self)
+            action.setIcon(icon(key))
             action.setCheckable(True)
-            action.setToolTip(label + " (" + shortcut + " — gdy płótno ma fokus)")
+            action.setToolTip(tr(label) + " (" + shortcut + ")")
             action.triggered.connect(lambda checked=False, k=key: self.set_tool(k))
             self.tool_group.addAction(action)
             tools.addAction(action)
@@ -332,7 +370,7 @@ class MainWindow(QMainWindow):
         self.active_tool = "hand"
 
     def build_ai(self):
-        dock = QDockWidget("STUDIO AI", self)
+        dock = QDockWidget(tr("STUDIO AI"), self)
         dock.setFeatures(QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
         dock.setMinimumWidth(310)
         dock.setMaximumWidth(430)
@@ -340,45 +378,47 @@ class MainWindow(QMainWindow):
         scroll.setWidgetResizable(True)
         body = QWidget()
         layout = QVBoxLayout(body)
-        brand = QLabel("Paint.Tes")
+        brand = QLabel("Paint.TES")
         brand.setObjectName("brand")
         layout.addWidget(brand)
-        label = QLabel("KAWA • PIKSELE • VOLTA")
+        label = QLabel(tr("KAWA • PIKSELE • VOLTA"))
         label.setObjectName("section")
         layout.addWidget(label)
         layout.addSpacing(10)
         form = QFormLayout()
         self.model = QComboBox()
+        self.model.setProperty("userContent", True)
         self.model.currentIndexChanged.connect(self.model_changed)
         self.mode = QComboBox()
         for key, label in (
-            ("txt2img", "Text to image"),
-            ("img2img", "Image to image"),
-            ("inpaint", "Inpaint • zaznaczenie"),
-            ("outpaint", "Outpaint • nowe marginesy"),
+            ("txt2img", tr("Text to image")),
+            ("img2img", tr("Image to image")),
+            ("inpaint", tr("Inpaint • zaznaczenie")),
+            ("outpaint", tr("Outpaint • nowe marginesy")),
         ):
             self.mode.addItem(label, key)
         self.mode.currentIndexChanged.connect(self.update_hint)
-        form.addRow("Model lokalny", self.model)
-        form.addRow("Tryb", self.mode)
+        form.addRow(tr("Model lokalny"), self.model)
+        form.addRow(tr("Tryb"), self.mode)
         layout.addLayout(form)
-        manage = QPushButton("Modele i ustawienia…")
+        manage = QPushButton(tr("Modele i ustawienia…"))
         manage.clicked.connect(self.open_settings)
         layout.addWidget(manage)
         label = QLabel("PROMPT")
         label.setObjectName("section")
         layout.addWidget(label)
         self.prompt = QPlainTextEdit()
-        self.prompt.setPlaceholderText("Co chcesz zobaczyć lub zmienić?")
+        self.prompt.setPlaceholderText(tr("Co chcesz zobaczyć lub zmienić?"))
         self.prompt.setMinimumHeight(100)
         layout.addWidget(self.prompt)
         self.negative = QPlainTextEdit()
-        self.negative.setPlaceholderText("Negatywny prompt (opcjonalnie)")
+        self.negative.setPlaceholderText(tr("Negatywny prompt (opcjonalnie)"))
         self.negative.setMaximumHeight(65)
         layout.addWidget(self.negative)
         form = QFormLayout()
         self.reference = QComboBox()
-        form.addRow("Karta referencji", self.reference)
+        self.reference.setProperty("userContent", True)
+        form.addRow(tr("Karta referencji"), self.reference)
         self.reference.currentIndexChanged.connect(self.update_hint)
         self.ref_hint = QLabel()
         self.ref_hint.setWordWrap(True)
@@ -390,41 +430,73 @@ class MainWindow(QMainWindow):
         row.addWidget(self.width)
         row.addWidget(QLabel("×"))
         row.addWidget(self.height)
-        form.addRow("Nowy obraz (px)", row)
+        form.addRow(QLabel(tr("Nowy obraz (px)")))
+        form.addRow(row)
         self.steps = spin(25, 1, 150, 1)
-        self.cfg = QDoubleSpinBox()
+        self.cfg = DecimalSpinBox()
         self.cfg.setRange(0, 30)
         self.cfg.setSingleStep(0.5)
         self.cfg.setValue(7)
-        self.strength = QDoubleSpinBox()
+        self.strength = DecimalSpinBox()
         self.strength.setRange(0.01, 1)
         self.strength.setSingleStep(0.05)
         self.strength.setValue(0.65)
-        self.seed = QPlainTextEdit()
-        self.seed.setFixedHeight(38)
-        self.seed.setPlaceholderText("losowy")
+        self.strength.setLocale(QLocale.c())
+        self.strength.setDecimals(2)
+        self.strength.setKeyboardTracking(False)
+        self.strength.setToolTip(
+            tr(
+                "0.01 = mała zmiana; 1.00 = pełny poziom szumu. Przy niewielu krokach efekty są skokowe."
+            )
+        )
+        self.seed = QLineEdit()
+        self.seed.setMaxLength(19)
+        self.seed.setValidator(
+            QRegularExpressionValidator(QRegularExpression("[0-9]{0,19}"), self.seed)
+        )
+        self.seed.setPlaceholderText(tr("Losowy (puste pole)"))
+        self.seed.setToolTip(
+            tr(
+                "Wpisz liczbę 0–9223372036854775807. Puste pole losuje nowy seed dla każdego zadania."
+            )
+        )
         self.sampler = QComboBox()
         self.sampler.addItems(["euler", "dpmpp_2m", "heun", "uni_pc"])
         self.scheduler = QComboBox()
         self.scheduler.addItems(["normal", "simple", "karras", "sgm_uniform"])
         for label, widget in (
-            ("Kroki", self.steps),
+            (tr("Kroki"), self.steps),
             ("CFG", self.cfg),
-            ("Siła zmiany", self.strength),
-            ("Seed", self.seed),
-            ("Sampler", self.sampler),
-            ("Scheduler", self.scheduler),
+            (tr("Siła zmiany"), self.strength),
+            (tr("Seed"), self.seed),
+            (tr("Sampler"), self.sampler),
+            (tr("Scheduler"), self.scheduler),
         ):
             form.addRow(label, widget)
+        self.strength_hint = QLabel(
+            tr(
+                "Siła zmiany działa w trybach image-to-image, inpaint i outpaint. Text-to-image zawsze używa pełnego szumu (1.0)."
+            )
+        )
+        self.strength_hint.setWordWrap(True)
+        self.strength_hint.setObjectName("muted")
+        form.addRow(self.strength_hint)
+        self.last_seed_label = QLabel(tr("Ostatni seed: —"))
+        self.last_seed_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.reuse_seed_button = QPushButton(tr("Użyj ostatniego seeda"))
+        self.reuse_seed_button.setEnabled(False)
+        self.reuse_seed_button.clicked.connect(lambda: self.seed.setText(str(self.last_seed)))
+        form.addRow(self.last_seed_label)
+        form.addRow(self.reuse_seed_button)
         layout.addLayout(form)
-        self.generate_button = QPushButton("Generuj obraz")
+        self.generate_button = QPushButton(tr("Generuj obraz"))
         self.generate_button.setObjectName("primary")
         self.generate_button.clicked.connect(self.generate)
         layout.addWidget(self.generate_button)
-        self.bg_button = QPushButton("Usuń tło → przezroczystość")
+        self.bg_button = QPushButton(tr("Usuń tło → przezroczystość"))
         self.bg_button.clicked.connect(self.remove_background)
         layout.addWidget(self.bg_button)
-        self.cancel_button = QPushButton("Anuluj zadanie")
+        self.cancel_button = QPushButton(tr("Anuluj zadanie"))
         self.cancel_button.clicked.connect(self.cancel_job)
         self.cancel_button.setEnabled(False)
         layout.addWidget(self.cancel_button)
@@ -433,11 +505,20 @@ class MainWindow(QMainWindow):
         self.progress.setValue(0)
         self.progress.setVisible(False)
         layout.addWidget(self.progress)
-        self.job_status = QLabel("Wyniki powstają w nowych kartach. Zapisujesz je samodzielnie.")
+        self.job_status = QLabel(
+            tr("Wyniki powstają w nowych kartach. Zapisujesz je samodzielnie.")
+        )
         self.job_status.setWordWrap(True)
         self.job_status.setObjectName("muted")
         layout.addWidget(self.job_status)
         layout.addStretch()
+        for combo in body.findChildren(QComboBox):
+            combo.setSizeAdjustPolicy(
+                QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+            )
+            combo.setMinimumContentsLength(8)
+            combo.setMinimumWidth(0)
+            combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         scroll.setWidget(body)
         container = QWidget()
         outer = QVBoxLayout(container)
@@ -461,7 +542,7 @@ class MainWindow(QMainWindow):
     def canvas(self):
         return self.tabs.currentWidget() if isinstance(self.tabs.currentWidget(), Canvas) else None
 
-    def add_document(self, image, title="Nowy obraz", path=None, clean=False, metadata=None):
+    def add_document(self, image, title=tr("Nowy obraz"), path=None, clean=False, metadata=None):
         validate_size(*image.size)
         document = Document(image.convert("RGBA"), title, path=path, limit=self.settings.undo_limit)
         if clean:
@@ -491,10 +572,10 @@ class MainWindow(QMainWindow):
         self.redo_action.setEnabled(bool(canvas and canvas.document.redo_history))
         if canvas:
             im = canvas.document.image
-            self.setWindowTitle(f"{canvas.document.title} — Paint.Tes")
+            self.setWindowTitle(f"{canvas.document.title} — Paint.TES")
             if not self.job:
                 self.status_label.setText(
-                    f"{im.width} × {im.height} px • RGBA • {self.active_tool}"
+                    f"{im.width} × {im.height} px • RGBA • {self.tool_actions[self.active_tool].text()}"
                 )
 
     def current_changed(self, index):
@@ -507,7 +588,7 @@ class MainWindow(QMainWindow):
         selected = getattr(self, "pending_reference", None) or self.reference.currentData()
         self.reference.blockSignals(True)
         self.reference.clear()
-        self.reference.addItem("Brak", "")
+        self.reference.addItem(tr("Brak"), "")
         current = self.canvas()
         for i in range(self.tabs.count()):
             document = self.tabs.widget(i).document
@@ -524,7 +605,7 @@ class MainWindow(QMainWindow):
         self.model.blockSignals(True)
         self.model.clear()
         if not self.settings.profiles:
-            self.model.addItem("Dodaj lokalny profil w ustawieniach", "")
+            self.model.addItem(tr("Dodaj lokalny profil w ustawieniach"), "")
         for profile in self.settings.profiles:
             self.model.addItem(profile.name, profile.id)
         self.model.setCurrentIndex(max(0, self.model.findData(current)))
@@ -538,10 +619,14 @@ class MainWindow(QMainWindow):
         profile = self.selected_profile()
         if profile:
             self.settings.active_profile = profile.id
-            if profile.family in ("qwen21", "moss"):
+            profile_key = (profile.id, profile.family)
+            if profile.family in ("qwen21", "moss") and profile_key != getattr(
+                self, "_last_profile_key", None
+            ):
                 self.cfg.setValue(4)
                 self.steps.setValue(20)
                 self.scheduler.setCurrentText("simple")
+            self._last_profile_key = profile_key
             self.update_hint()
 
     def update_hint(self):
@@ -549,11 +634,13 @@ class MainWindow(QMainWindow):
             return
         profile = self.selected_profile()
         if profile and profile.family == "qwen21":
-            text = (
+            text = tr(
                 "Inna karta jest niezależną referencją Qwen. Dla edycji źródłem jest aktywna karta."
             )
         else:
-            text = "Dla SD/SDXL/MOSS karta referencji może być źródłem image-to-image. Niezależne referencje są dostępne w Qwen 2.1."
+            text = tr(
+                "Dla SD/SDXL/MOSS karta referencji może być źródłem image-to-image. Niezależne referencje są dostępne w Qwen 2.1."
+            )
         self.ref_hint.setText(text)
         self.strength.setEnabled(self.mode.currentData() != "txt2img")
 
@@ -574,7 +661,7 @@ class MainWindow(QMainWindow):
         color = QColorDialog.getColor(
             QColor(*self.brush_color),
             self,
-            "Kolor pędzla",
+            tr("Kolor pędzla"),
             QColorDialog.ColorDialogOption.ShowAlphaChannel,
         )
         if color.isValid():
@@ -589,13 +676,13 @@ class MainWindow(QMainWindow):
             width, height = dialog.width.value(), dialog.height.value()
             validate_size(width, height)
             if dialog.generate.isChecked() and (width % 16 or height % 16):
-                raise ValueError("Wymiary generacji muszą być wielokrotnością 16 px.")
+                raise ValueError(tr("Wymiary generacji muszą być wielokrotnością 16 px."))
             color = [(255, 255, 255, 255), (0, 0, 0, 0), (117, 82, 55, 255)][
                 dialog.background.currentIndex()
             ]
             self.add_document(
                 Image.new("RGBA", (width, height), color),
-                dialog.name.text().strip() or "Nowy obraz",
+                dialog.name.text().strip() or tr("Nowy obraz"),
             )
             self.width.setValue(width)
             self.height.setValue(height)
@@ -605,7 +692,7 @@ class MainWindow(QMainWindow):
                     self.model.setCurrentIndex(selected)
                 self.steps.setValue(dialog.steps.value())
                 self.cfg.setValue(dialog.cfg.value())
-                self.seed.setPlainText(dialog.seed.text())
+                self.seed.setText(dialog.seed.text())
                 self.prompt.setPlainText(dialog.prompt.toPlainText())
                 self.mode.setCurrentIndex(0)
                 self.generate()
@@ -615,9 +702,9 @@ class MainWindow(QMainWindow):
     def open_images(self):
         paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Otwórz obrazy",
+            tr("Otwórz obrazy"),
             self.settings.output_dir,
-            "Obrazy (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)",
+            tr("Obrazy (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)"),
         )
         for name in paths:
             try:
@@ -640,7 +727,7 @@ class MainWindow(QMainWindow):
                 )
             )
             name, kind = QFileDialog.getSaveFileName(
-                self, "Zapisz obraz", initial, "PNG (*.png);;WebP (*.webp);;JPEG (*.jpg)"
+                self, tr("Zapisz obraz"), initial, "PNG (*.png);;WebP (*.webp);;JPEG (*.jpg)"
             )
             if not name:
                 return False
@@ -667,7 +754,7 @@ class MainWindow(QMainWindow):
             document.title = path.name
             document.saved_revision = document.revision
             self.document_changed()
-            self.status_label.setText(f"Zapisano: {path}")
+            self.status_label.setText(tr("Zapisano: {0}").format(path))
             return True
         except Exception as error:
             self.show_error(str(error))
@@ -680,8 +767,8 @@ class MainWindow(QMainWindow):
         if canvas.document.dirty:
             answer = QMessageBox.question(
                 self,
-                "Niezapisany obraz",
-                f"Zapisać zmiany w „{canvas.document.title}”?",
+                tr("Niezapisany obraz"),
+                tr("Zapisać zmiany w „{0}”?").format(canvas.document.title),
                 QMessageBox.StandardButton.Save
                 | QMessageBox.StandardButton.Discard
                 | QMessageBox.StandardButton.Cancel,
@@ -739,7 +826,9 @@ class MainWindow(QMainWindow):
     def feather_selection(self):
         if not self.canvas() or not self.canvas().document.mask:
             return
-        radius, ok = QInputDialog.getInt(self, "Zmiękczenie maski", "Promień (px)", 8, 0, 256)
+        radius, ok = QInputDialog.getInt(
+            self, tr("Zmiękczenie maski"), tr("Promień (px)"), 8, 0, 256
+        )
         if ok:
             from PIL import ImageFilter
 
@@ -778,8 +867,8 @@ class MainWindow(QMainWindow):
         doc = self.canvas().document
         value, ok = QInputDialog.getText(
             self,
-            "Rozmiar obrazu",
-            "Szerokość × wysokość (np. 1024x768)",
+            tr("Rozmiar obrazu"),
+            tr("Szerokość × wysokość (np. 1024x768)"),
             text=f"{doc.image.width}x{doc.image.height}",
         )
         if ok:
@@ -810,30 +899,36 @@ class MainWindow(QMainWindow):
         if not image.isNull():
             from PIL.ImageQt import fromqimage
 
-            self.add_document(fromqimage(image), "Ze schowka")
+            self.add_document(fromqimage(image), tr("Ze schowka"))
 
     def use_reference(self):
         if not self.canvas():
             return
         ident = self.canvas().document.id
         self.status_label.setText(
-            "Wybierz inną kartę, a następnie tę kartę w polu Karta referencji."
+            tr("Wybierz inną kartę, a następnie tę kartę w polu Karta referencji.")
         )
         self.pending_reference = ident
 
     def open_settings(self):
         if self.job:
-            self.show_error("Poczekaj na zakończenie albo anuluj zadanie przed zmianą ustawień.")
+            self.show_error(
+                tr("Poczekaj na zakończenie albo anuluj zadanie przed zmianą ustawień.")
+            )
             return
         dialog = SettingsDialog(self, self.settings)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 dialog.settings.save()
                 self.settings = dialog.settings
+                set_language(self.settings.language)
+                apply_qt_language()
+                retranslate_widgets(self)
                 for i in range(self.tabs.count()):
                     self.tabs.widget(i).document.limit = self.settings.undo_limit
                 self.refresh_profiles()
-                self.status_label.setText("Ustawienia zapisane.")
+                self.refresh_references()
+                self.status_label.setText(tr("Ustawienia zapisane."))
             except Exception as error:
                 self.show_error(str(error))
 
@@ -842,7 +937,7 @@ class MainWindow(QMainWindow):
             return
         profile = self.selected_profile()
         if not profile:
-            self.show_error("Dodaj profil lokalnego modelu w ustawieniach.")
+            self.show_error(tr("Dodaj profil lokalnego modelu w ustawieniach."))
             return
         try:
             profile.validate()
@@ -860,7 +955,7 @@ class MainWindow(QMainWindow):
             )
             if mode != "txt2img":
                 if not canvas:
-                    raise ValueError("Otwórz obraz albo utwórz nową kartę.")
+                    raise ValueError(tr("Otwórz obraz albo utwórz nową kartę."))
                 doc = canvas.document
                 image = doc.image.copy()
                 if mode == "img2img" and refdoc and profile.family != "qwen21":
@@ -868,7 +963,7 @@ class MainWindow(QMainWindow):
                     refdoc = None
                 if mode == "inpaint":
                     if doc.mask is None or not doc.mask.getbbox():
-                        raise ValueError("Zaznacz obszar lassem, prostokątem lub elipsą.")
+                        raise ValueError(tr("Zaznacz obszar lassem, prostokątem lub elipsą."))
                     mask = doc.mask.copy()
                 elif mode == "outpaint":
                     dialog = OutpaintDialog(self)
@@ -876,16 +971,26 @@ class MainWindow(QMainWindow):
                         return
                     values = [dialog.margins[k].value() for k in ("left", "top", "right", "bottom")]
                     if not any(values):
-                        raise ValueError("Dodaj co najmniej jeden margines.")
+                        raise ValueError(tr("Dodaj co najmniej jeden margines."))
                     image, mask = expand_canvas(image, *values)
             if refdoc:
                 if profile.family != "qwen21":
                     raise ValueError(
-                        "Niezależna referencja działa z Qwen 2.1. Dla tego modelu wybierz image-to-image lub ustaw referencję na Brak."
+                        tr(
+                            "Niezależna referencja działa z Qwen 2.1. Dla tego modelu wybierz image-to-image lub ustaw referencję na Brak."
+                        )
                     )
                 reference = refdoc.image.copy()
-            seed_text = self.seed.toPlainText().strip()
-            seed = int(seed_text) if seed_text else secrets.randbelow(2**63)
+            seed_text = self.seed.text().strip()
+            try:
+                seed = int(seed_text) if seed_text else secrets.randbelow(2**63)
+                if not 0 <= seed < 2**63:
+                    raise ValueError()
+            except ValueError:
+                raise ValueError(
+                    tr("Seed musi być liczbą całkowitą od 0 do 9223372036854775807.")
+                ) from None
+            self.strength.interpretText()
             width, height = (
                 image.size if image is not None else (self.width.value(), self.height.value())
             )
@@ -904,8 +1009,8 @@ class MainWindow(QMainWindow):
             )
             request.validate()
             if mode == "txt2img" and (width % 16 or height % 16):
-                raise ValueError("Wymiary generacji muszą być wielokrotnością 16 px.")
-            title = f"{dict(txt2img='Generacja', img2img='Img2img', inpaint='Inpaint', outpaint='Outpaint')[mode]} • {seed}"
+                raise ValueError(tr("Wymiary generacji muszą być wielokrotnością 16 px."))
+            title = f"{dict(txt2img=tr('Generacja'), img2img='Img2img', inpaint='Inpaint', outpaint='Outpaint')[mode]} • {seed}"
             self.start_job(
                 Job(self.client, self.settings, profile, request, image, mask, reference, title)
             )
@@ -916,7 +1021,7 @@ class MainWindow(QMainWindow):
         if self.job:
             return
         if not self.canvas():
-            self.show_error("Otwórz obraz do usunięcia tła.")
+            self.show_error(tr("Otwórz obraz do usunięcia tła."))
             return
         self.start_job(
             Job(
@@ -927,7 +1032,7 @@ class MainWindow(QMainWindow):
                 self.canvas().document.image.copy(),
                 None,
                 None,
-                "Bez tła • " + self.canvas().document.title,
+                tr("Bez tła • ") + self.canvas().document.title,
                 background=True,
             )
         )
@@ -935,6 +1040,10 @@ class MainWindow(QMainWindow):
     def start_job(self, job):
         self.client.cancel_event.clear()
         self.job = job
+        if job.request is not None:
+            self.last_seed = job.request.seed
+            self.last_seed_label.setText(tr("Ostatni seed: {0}").format(self.last_seed))
+            self.reuse_seed_button.setEnabled(True)
         self.started = time.monotonic()
         self.generate_button.setEnabled(False)
         self.bg_button.setEnabled(False)
@@ -945,7 +1054,7 @@ class MainWindow(QMainWindow):
         job.success.connect(self.job_success)
         job.failure.connect(self.job_error)
         job.finished.connect(self.job_finished)
-        self.set_job_status("Przygotowanie lokalnego zadania…")
+        self.set_job_status(tr("Przygotowanie lokalnego zadania…"))
         self.elapsed.start(1000)
         job.start()
 
@@ -960,10 +1069,10 @@ class MainWindow(QMainWindow):
 
     def job_success(self, image, title, metadata):
         self.add_document(image, title, metadata=metadata)
-        self.set_job_status("Gotowe. Wynik w nowej karcie — zapisz, aby zachować obraz.")
+        self.set_job_status(tr("Gotowe. Wynik w nowej karcie — zapisz, aby zachować obraz."))
 
     def job_error(self, message):
-        self.set_job_status("Zadanie zakończone błędem. Obrazy źródłowe pozostały bez zmian.")
+        self.set_job_status(tr("Zadanie zakończone błędem. Obrazy źródłowe pozostały bez zmian."))
         self.show_error(message)
 
     def job_finished(self):
@@ -983,20 +1092,21 @@ class MainWindow(QMainWindow):
         if self.job:
             self.job.cancel()
             self.cancel_button.setEnabled(False)
-            self.set_job_status("Anulowanie…")
+            self.set_job_status(tr("Anulowanie…"))
 
     def release_engine(self):
         if self.job:
-            self.show_error("Najpierw anuluj bieżące zadanie.")
+            self.show_error(tr("Najpierw anuluj bieżące zadanie."))
             return
         self.client.stop()
-        self.status_label.setText("Pamięć silnika Paint.Tes zwolniona.")
+        self.status_label.setText(tr("Pamięć silnika Paint.TES zwolniona."))
 
     def show_error(self, message):
-        QMessageBox.warning(self, "Paint.Tes", message)
+        QMessageBox.warning(self, "Paint.TES", message)
 
     def help(self):
-        path = Path(__file__).resolve().parents[1] / "docs" / "INSTRUKCJA.md"
+        filename = "INSTRUKCJA.md" if self.settings.language == "pl" else "USER_GUIDE.md"
+        path = Path(__file__).resolve().parents[1] / "docs" / filename
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
     def closeEvent(self, event):

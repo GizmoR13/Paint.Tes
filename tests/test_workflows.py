@@ -83,3 +83,20 @@ def test_qwen_edit_sees_both_source_and_independent_reference():
     assert encoder["inputs"]["images.image_1"] != encoder["inputs"]["images.image_2"]
     source = graph[encoder["inputs"]["images.image_1"][0]]
     assert source["inputs"]["image"] == "source.png"
+
+
+def test_repeated_fixed_seed_has_fresh_save_node():
+    profile = ModelProfile(family="sdxl")
+    request = Generation(seed=42)
+    first = build_workflow(profile, request, {"checkpoint": "local.safetensors"})
+    second = build_workflow(profile, request, {"checkpoint": "local.safetensors"})
+    saves = [
+        next(n for n in graph.values() if n["class_type"] == "SaveImage")
+        for graph in (first, second)
+    ]
+    samplers = [
+        next(n for n in graph.values() if n["class_type"] == "KSampler")
+        for graph in (first, second)
+    ]
+    assert samplers[0] == samplers[1]
+    assert saves[0]["inputs"]["filename_prefix"] != saves[1]["inputs"]["filename_prefix"]

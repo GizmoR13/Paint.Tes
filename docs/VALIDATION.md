@@ -35,3 +35,17 @@ Silnik ComfyUI: commit `3f438ca69f3d0efc5f748de055daeea9ba26ee50`.
 
 Nie pobierano modeli w ramach testów. Nie zmieniano istniejącej instalacji
 ComfyUI, sterownika, ustawień zasilania ani działających silników LLM.
+
+## Aktualizacja 0.2 — 2026-11-13
+
+- 37 testów automatycznych przeszło (test ONNX pozostaje osobnym testem opt-in).
+- Domyślny angielski, przełączanie EN/PL bez utraty kart, promptu i parametrów,
+  zapis języka, ikony i podpowiedzi obu pasków.
+- Wpisanie `0.25` i `0,80` przekazuje prawidłową siłę zmiany do KSampler.
+  Seed 0 i maksymalny 64-bitowy seed są przekazywane bez zaokrąglenia;
+  wartości poza zakresem są odrzucane, a puste pole losuje seed.
+- Rzeczywisty MOSS na V100: dwa identyczne zadania img2img 128×128 / 8 kroków
+  dały identyczne piksele. Zmiana seeda oraz zmiana siły 0.25→0.80 zmieniły wynik.
+- Nazwa pliku wyjściowego jest unikalna dla każdego zadania. Powtarzane zadanie
+  ze stałym seedem nie odwołuje się do już usuniętego pliku roboczego z cache.
+- Kontrola zrzutów EN i PL, formatowanie i lint przeszły.

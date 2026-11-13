@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from .i18n import tr
+
 
 def remove_background(source: Path, target: Path, model: Path, size: int, normalization: str):
     from .hardware import require_volta
@@ -17,16 +19,16 @@ def remove_background(source: Path, target: Path, model: Path, size: int, normal
     from .imageops import load_image
 
     if not model.is_file() or model.suffix.lower() != ".onnx":
-        raise ValueError("Wybierz lokalny model segmentacji .onnx w ustawieniach.")
+        raise ValueError(tr("Wybierz lokalny model segmentacji .onnx w ustawieniach."))
     if size not in (320, 512, 1024):
-        raise ValueError("Rozmiar wejściowy modelu segmentacji: 320, 512 lub 1024.")
+        raise ValueError(tr("Rozmiar wejściowy modelu segmentacji: 320, 512 lub 1024."))
     if "CUDAExecutionProvider" not in ort.get_available_providers():
-        raise RuntimeError("ONNX Runtime nie ma backendu CUDA. Uruchom setup.sh.")
+        raise RuntimeError(tr("ONNX Runtime nie ma backendu CUDA. Uruchom setup.sh."))
     session = ort.InferenceSession(
         str(model), providers=[("CUDAExecutionProvider", {"device_id": 0}), "CPUExecutionProvider"]
     )
     if "CUDAExecutionProvider" not in session.get_providers():
-        raise RuntimeError("Nie udało się uruchomić segmentacji na V100.")
+        raise RuntimeError(tr("Nie udało się uruchomić segmentacji na V100."))
     image = load_image(source)
     array = (
         np.asarray(
@@ -43,7 +45,9 @@ def remove_background(source: Path, target: Path, model: Path, size: int, normal
     output = np.asarray(session.run(None, {session.get_inputs()[0].name: tensor})[0]).squeeze()
     if output.ndim != 2:
         raise ValueError(
-            "Model nie zwrócił pojedynczej maski. Obsługiwane: U2Net/ISNet/BiRefNet z wejściem RGB NCHW i maską N1HW."
+            tr(
+                "Model nie zwrócił pojedynczej maski. Obsługiwane: U2Net/ISNet/BiRefNet z wejściem RGB NCHW i maską N1HW."
+            )
         )
     if normalization == "birefnet":
         output = 1.0 / (1.0 + np.exp(-np.clip(output, -60, 60)))

@@ -6,11 +6,13 @@ from uuid import uuid4
 
 from PIL import Image
 
+from .i18n import tr
+
 
 @dataclass
 class Document:
     image: Image.Image
-    title: str = "Nowy obraz"
+    title: str = tr("Nowy obraz")
     path: Path | None = None
     id: str = field(default_factory=lambda: uuid4().hex)
     mask: Image.Image | None = None

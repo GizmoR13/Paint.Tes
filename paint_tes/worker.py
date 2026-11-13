@@ -8,6 +8,8 @@ import runpy
 import sys
 from pathlib import Path
 
+from .i18n import tr
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -22,7 +24,7 @@ def main():
     torch = require_volta()
     root = Path(__file__).resolve().parents[1] / "engine" / "ComfyUI"
     if not (root / "main.py").is_file():
-        raise RuntimeError("Brakuje silnika. Uruchom git submodule update --init --recursive.")
+        raise RuntimeError(tr("Brakuje silnika. Uruchom git submodule update --init --recursive."))
     data = Path(args.data)
     for name in ("input", "output", "temp", "user"):
         (data / name).mkdir(parents=True, exist_ok=True)
@@ -79,7 +81,7 @@ def main():
 
         RETURN_TYPES = ("LATENT",)
         FUNCTION = "create"
-        CATEGORY = "Paint.Tes"
+        CATEGORY = "Paint.TES"
 
         def create(self, width, height, batch_size=1):
             import comfy.model_management

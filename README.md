@@ -1,10 +1,19 @@
-# Paint.Tes
+# Paint.TES
 
 Natywny edytor obrazu dla rodziny Ubuntu, z kawowym interfejsem i lokalną generacją
 na NVIDIA V100/V100S/TITAN V (Volta, sm_70). Układ pracy inspirowany edytorami typu
 Paint.NET: narzędzia po lewej, dokumenty w kartach i panel AI po prawej.
 
 ![Paint.Tes — natywne okno z obrazem wygenerowanym lokalnie na V100](docs/screens/paint-tes.png)
+
+## Version 0.2 — English / Polski
+
+English is now the default UI language. Switch immediately in
+**Settings → General → Language**. Both toolbars use icons with localized
+tooltips. Seed is an exact integer input with last-seed reuse; denoising strength
+accepts either decimal separator and applies to editing modes.
+
+[English user guide](docs/USER_GUIDE.md) · [Instrukcja po polsku](docs/INSTRUKCJA.md)
 
 ## Funkcje
 

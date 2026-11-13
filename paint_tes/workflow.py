@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from uuid import uuid4
 
 from .config import ModelProfile
+from .i18n import tr
 from .imageops import validate_size
 
 
@@ -25,26 +27,34 @@ class Generation:
     def validate(self):
         validate_size(self.width, self.height)
         if self.mode not in ("txt2img", "img2img", "inpaint", "outpaint"):
-            raise ValueError("Nieznany tryb generacji.")
+            raise ValueError(tr("Nieznany tryb generacji."))
         if not 1 <= self.steps <= 150 or not 0 <= self.cfg <= 30 or not 0.01 <= self.strength <= 1:
-            raise ValueError("Nieprawidłowe parametry generacji.")
+            raise ValueError(tr("Nieprawidłowe parametry generacji."))
         if not 0 <= self.seed < 2**63:
-            raise ValueError("Seed poza zakresem.")
+            raise ValueError(tr("Seed poza zakresem."))
 
 
 def build_workflow(
-    profile: ModelProfile, request: Generation, names: dict, image=None, mask=None, reference=None
+    profile: ModelProfile,
+    request: Generation,
+    names: dict,
+    image=None,
+    mask=None,
+    reference=None,
+    output_prefix=None,
 ):
     request.validate()
     if request.width % 16 or request.height % 16:
-        raise ValueError("Wymiary przekazane silnikowi muszą być wielokrotnością 16.")
+        raise ValueError(tr("Wymiary przekazane silnikowi muszą być wielokrotnością 16."))
     if request.mode != "txt2img" and not image:
-        raise ValueError("Ten tryb wymaga obrazu źródłowego.")
+        raise ValueError(tr("Ten tryb wymaga obrazu źródłowego."))
     if request.mode in ("inpaint", "outpaint") and not mask:
-        raise ValueError("Inpaint/outpaint wymaga maski.")
+        raise ValueError(tr("Inpaint/outpaint wymaga maski."))
     if reference and profile.family != "qwen21":
         raise ValueError(
-            "Referencja niezależna od obrazu źródłowego wymaga Qwen-Image 2.1. Dla SDXL/MOSS użyj karty referencji jako źródła image-to-image."
+            tr(
+                "Referencja niezależna od obrazu źródłowego wymaga Qwen-Image 2.1. Dla SDXL/MOSS użyj karty referencji jako źródła image-to-image."
+            )
         )
     graph = {}
 
@@ -130,5 +140,5 @@ def build_workflow(
         denoise=1.0 if request.mode == "txt2img" else request.strength,
     )
     pixels = node("VAEDecode", samples=samples, vae=vae)
-    node("SaveImage", images=pixels, filename_prefix="PaintTes")
+    node("SaveImage", images=pixels, filename_prefix=output_prefix or "PaintTES-" + uuid4().hex)
     return graph

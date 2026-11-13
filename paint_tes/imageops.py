@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
+from .i18n import tr
+
 MAX_SIDE = 8192
 MAX_PIXELS = 32 * 1024 * 1024
 
 
 def validate_size(width: int, height: int) -> None:
     if not (16 <= width <= MAX_SIDE and 16 <= height <= MAX_SIDE) or width * height > MAX_PIXELS:
-        raise ValueError("Rozmiar: 16–8192 px na bok, maksymalnie 32 megapiksele.")
+        raise ValueError(tr("Rozmiar: 16–8192 px na bok, maksymalnie 32 megapiksele."))
 
 
 def load_image(path) -> Image.Image:
@@ -34,13 +36,13 @@ def selection_mask(size, points=None, rectangle=None, feather=0) -> Image.Image:
 
 def composite_edit(original: Image.Image, generated: Image.Image, mask: Image.Image) -> Image.Image:
     if original.size != generated.size or mask.size != original.size:
-        raise ValueError("Obraz, wynik i maska muszą mieć ten sam rozmiar.")
+        raise ValueError(tr("Obraz, wynik i maska muszą mieć ten sam rozmiar."))
     return Image.composite(generated.convert("RGBA"), original.convert("RGBA"), mask.convert("L"))
 
 
 def expand_canvas(image: Image.Image, left: int, top: int, right: int, bottom: int):
     if min(left, top, right, bottom) < 0:
-        raise ValueError("Marginesy nie mogą być ujemne.")
+        raise ValueError(tr("Marginesy nie mogą być ujemne."))
     size = (image.width + left + right, image.height + top + bottom)
     validate_size(*size)
     expanded = Image.new("RGBA", size, (255, 255, 255, 0))

@@ -14,6 +14,6 @@ applications.mkdir(parents=True,exist_ok=True)
 entry=applications/'paint-tes.desktop'
 data_env=os.environ.get('PAINT_TES_DATA','')
 prefix='env '+quote('PAINT_TES_DATA='+data_env)+' ' if data_env else ''
-entry.write_text('[Desktop Entry]\nType=Application\nName=Paint.Tes\nComment=Local image editor for NVIDIA Volta\nExec='+prefix+quote(root/'start.sh')+' %F\nIcon='+str(root/'resources/paint-tes.svg')+'\nTerminal=false\nCategories=Graphics;RasterGraphics;\nMimeType=image/png;image/jpeg;image/webp;\nStartupWMClass=Paint.Tes\n')
+entry.write_text('[Desktop Entry]\nType=Application\nName=Paint.TES\nComment=Local image editor for NVIDIA Volta\nExec='+prefix+quote(root/'start.sh')+' %F\nIcon='+str(root/'resources/paint-tes.svg')+'\nTerminal=false\nCategories=Graphics;RasterGraphics;\nMimeType=image/png;image/jpeg;image/webp;\nStartupWMClass=Paint.TES\n')
 print(entry)
 PY

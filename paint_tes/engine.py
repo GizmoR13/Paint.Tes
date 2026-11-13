@@ -19,6 +19,7 @@ from PIL import Image
 
 from .config import ModelProfile, Settings, data_path
 from .hardware import list_gpus
+from .i18n import tr
 from .imageops import composite_edit, padded_for_engine
 from .workflow import Generation, build_workflow
 
@@ -100,7 +101,7 @@ class EngineClient:
         if not gpu and available:
             gpu = available[0]["uuid"]
         if not gpu or gpu not in {g["uuid"] for g in available}:
-            raise ValueError("W ustawieniach wybierz dostępną V100/V100S/TITAN V.")
+            raise ValueError(tr("W ustawieniach wybierz dostępną V100/V100S/TITAN V."))
         signature = (gpu, settings.precision, settings.offload)
         if self.process and self.process.poll() is None and signature == self.signature:
             return
@@ -144,16 +145,16 @@ class EngineClient:
         )
         self.url = f"http://127.0.0.1:{port}"
         self.signature = signature
-        report("Uruchamianie lokalnego silnika V100…")
+        report(tr("Uruchamianie lokalnego silnika V100…"))
         deadline = time.monotonic() + 180
         while time.monotonic() < deadline:
             if self.cancel_event.is_set():
                 self.stop()
-                raise Cancelled("Anulowano uruchamianie silnika.")
+                raise Cancelled(tr("Anulowano uruchamianie silnika."))
             if self.process.poll() is not None:
                 tail = (self.root / "engine.log").read_text(errors="replace")[-3500:]
                 self.stop()
-                raise RuntimeError("Nie udało się uruchomić silnika.\n" + tail)
+                raise RuntimeError(tr("Nie udało się uruchomić silnika.\n") + tail)
             try:
                 self.http.get(self.url + "/system_stats", timeout=2).raise_for_status()
                 return
@@ -161,7 +162,7 @@ class EngineClient:
                 self.cancel_event.wait(0.3)
         self.stop()
         raise TimeoutError(
-            "Silnik nie uruchomił się w ciągu 180 s. Sprawdź dziennik w ustawieniach."
+            tr("Silnik nie uruchomił się w ciągu 180 s. Sprawdź dziennik w ustawieniach.")
         )
 
     def upload(self, image: Image.Image, prefix):
@@ -193,7 +194,9 @@ class EngineClient:
         names, paths_file = self.register_models(profile)
         if settings.precision == "fp16" and profile.family in ("qwen21", "moss"):
             raise ValueError(
-                "Qwen/MOSS wymaga trybu bezpiecznego FP32 na V100. Zmień precyzję w ustawieniach."
+                tr(
+                    "Qwen/MOSS wymaga trybu bezpiecznego FP32 na V100. Zmień precyzję w ustawieniach."
+                )
             )
         self.ensure_server(settings, paths_file, report)
         source_size = image.size if image else (request.width, request.height)
@@ -208,25 +211,35 @@ class EngineClient:
                 request = replace(request, width=padded.width, height=padded.height)
             if reference:
                 ref_name = self.upload(reference.convert("RGB"), "reference")
-            graph = build_workflow(profile, request, names, image_name, mask_name, ref_name)
+            graph = build_workflow(
+                profile,
+                request,
+                names,
+                image_name,
+                mask_name,
+                ref_name,
+                output_prefix="PaintTES-" + uuid4().hex,
+            )
             if self.cancel_event.is_set():
-                raise Cancelled("Anulowano.")
+                raise Cancelled(tr("Anulowano."))
             response = self.http.post(
                 self.url + "/prompt", json={"prompt": graph, "client_id": uuid4().hex}, timeout=30
             )
             if not response.ok:
-                raise RuntimeError("Silnik odrzucił konfigurację modelu:\n" + response.text[:3000])
+                raise RuntimeError(
+                    tr("Silnik odrzucił konfigurację modelu:\n") + response.text[:3000]
+                )
             self.prompt_id = response.json()["prompt_id"]
-            report("Generowanie… pierwsze ładowanie dużego modelu może potrwać kilka minut.")
+            report(tr("Generowanie… pierwsze ładowanie dużego modelu może potrwać kilka minut."))
             while True:
                 if self.cancel_event.wait(0.5):
                     self.cancel()
                     # Terminate our worker, so the next task never races with a cancelled prompt.
                     self.stop()
-                    raise Cancelled("Anulowano generowanie.")
+                    raise Cancelled(tr("Anulowano generowanie."))
                 if self.process.poll() is not None:
                     raise RuntimeError(
-                        "Silnik zakończył pracę. Możliwy brak RAM/VRAM; sprawdź dziennik."
+                        tr("Silnik zakończył pracę. Możliwy brak RAM/VRAM; sprawdź dziennik.")
                     )
                 result = self.http.get(self.url + "/history/" + self.prompt_id, timeout=10)
                 result.raise_for_status()
@@ -236,7 +249,7 @@ class EngineClient:
                 status = entry.get("status", {})
                 if status.get("status_str") == "error":
                     raise RuntimeError(
-                        "Błąd generacji:\n"
+                        tr("Błąd generacji:\n")
                         + json.dumps(status.get("messages", []), ensure_ascii=False)[-3500:]
                     )
                 for output in entry.get("outputs", {}).values():
@@ -266,7 +279,7 @@ class EngineClient:
                             output_path.unlink()
                         return generated
                 if status.get("completed"):
-                    raise RuntimeError("Silnik zakończył zadanie bez obrazu.")
+                    raise RuntimeError(tr("Silnik zakończył zadanie bez obrazu."))
         finally:
             self.prompt_id = None
             # Only remove the uniquely named uploads created for this job.

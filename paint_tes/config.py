@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from uuid import uuid4
 
+from .i18n import tr
+
 FAMILIES = {
     "sd15": "Stable Diffusion 1.5",
     "sdxl": "SDXL",
@@ -15,6 +17,7 @@ FAMILIES = {
 
 
 def config_path() -> Path:
+    # Retain the legacy directory so upgrades keep existing profiles and preferences.
     return (
         Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
         / "Paint.Tes"
@@ -31,7 +34,7 @@ def data_path() -> Path:
 
 @dataclass
 class ModelProfile:
-    name: str = "Nowy model"
+    name: str = field(default_factory=lambda: tr("Nowy model"))
     family: str = "sdxl"
     checkpoint: str = ""
     diffusion: str = ""
@@ -44,7 +47,7 @@ class ModelProfile:
 
     def validate(self) -> None:
         if self.family not in FAMILIES:
-            raise ValueError("Nieznana rodzina modelu.")
+            raise ValueError(tr("Nieznana rodzina modelu."))
         required = (
             ("checkpoint",) if self.family in ("sd15", "sdxl") else ("diffusion", "encoder", "vae")
         )
@@ -52,20 +55,24 @@ class ModelProfile:
             path = Path(getattr(self, key)).expanduser()
             if not getattr(self, key) or not path.is_file():
                 raise ValueError(
-                    f"Brak lokalnego pliku ({key}): {getattr(self, key) or 'nie wybrano'}"
+                    tr("Brak lokalnego pliku ({0}): {1}").format(
+                        key, getattr(self, key) or tr("nie wybrano")
+                    )
                 )
             if path.suffix.lower() != ".safetensors":
                 raise ValueError(
-                    "Wybierz wagi .safetensors. GGUF i katalogi Diffusers wymagają innego loadera i nie są obsługiwane w tej wersji."
+                    tr(
+                        "Wybierz wagi .safetensors. GGUF i katalogi Diffusers wymagają innego loadera i nie są obsługiwane w tej wersji."
+                    )
                 )
         if not self.name.strip():
-            raise ValueError("Podaj nazwę profilu.")
+            raise ValueError(tr("Podaj nazwę profilu."))
 
 
 @dataclass
 class Settings:
     model_roots: list[str] = field(default_factory=list)
-    output_dir: str = str(Path.home() / "Pictures" / "Paint.Tes")
+    output_dir: str = str(Path.home() / "Pictures" / "Paint.TES")
     gpu_uuid: str = ""
     precision: str = "safe"
     offload: str = "lowvram"
@@ -75,6 +82,7 @@ class Settings:
     profiles: list[ModelProfile] = field(default_factory=list)
     active_profile: str = ""
     undo_limit: int = 20
+    language: str = "en"
 
     @classmethod
     def load(cls, path: Path | None = None) -> Settings:
