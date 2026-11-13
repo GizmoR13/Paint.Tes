@@ -67,7 +67,7 @@ def test_strength_and_exact_64_bit_seed_reach_sampler(qtbot, tmp_path, monkeypat
     window = make_window(qtbot, tmp_path, monkeypatch)
     window.add_document(Image.new("RGBA", (64, 64), "white"), "Source")
     assert isinstance(window.seed, QLineEdit)
-    assert not window.strength.isEnabled()  # txt2img has no source-image denoise.
+    assert window.strength.isEnabled()  # Can be preset even in txt2img.
     window.mode.setCurrentIndex(window.mode.findData("img2img"))
     assert window.strength.isEnabled()
     window.strength.lineEdit().selectAll()

@@ -49,3 +49,16 @@ ComfyUI, sterownika, ustawień zasilania ani działających silników LLM.
 - Nazwa pliku wyjściowego jest unikalna dla każdego zadania. Powtarzane zadanie
   ze stałym seedem nie odwołuje się do już usuniętego pliku roboczego z cache.
 - Kontrola zrzutów EN i PL, formatowanie i lint przeszły.
+
+## Poprawki GUI 0.2.1 — 2026-11-13
+
+- 48 testów przeszło; osobny test GPU/ONNX pozostaje opt-in.
+- Klikanie rzeczywistych strzałek QStyle zwiększa i zmniejsza rozmiar pędzla,
+  szerokość, wysokość, kroki, CFG i strength. Wysokokontrastowe SVG dla wszystkich
+  spinboxów oraz list rozwijanych, także w oknach dialogowych.
+- Rozdzielczość jest w jednym wierszu formularza, z podpisem po lewej i polami
+  obok siebie. Kontrola EN/PL przy 1440×900 i 1000×680, bez przewijania poziomego.
+- Informacyjne etykiety dobierają wysokość do całego zawiniętego tekstu.
+- Strength jest edytowalny również w text-to-image, aby można go było ustawić
+  z wyprzedzeniem. Sampler txt2img nadal używa 1.0; edycja używa wpisanej wartości.
+- Obejrzano zrzut pełnego panelu z polami i nieuciętymi informacjami.

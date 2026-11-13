@@ -47,7 +47,7 @@ from PySide6.QtWidgets import (
 
 from .canvas import Canvas
 from .config import Settings, data_path
-from .dialogs import DecimalSpinBox, NewImageDialog, OutpaintDialog, SettingsDialog, spin
+from .dialogs import DecimalSpinBox, InfoLabel, NewImageDialog, OutpaintDialog, SettingsDialog, spin
 from .document import Document
 from .engine import Cancelled, EngineClient
 from .hardware import list_gpus
@@ -295,7 +295,7 @@ class MainWindow(QMainWindow):
                 self,
                 "Paint.TES",
                 tr(
-                    "Paint.TES 0.2.0\nNatywny edytor dla Ubuntu i kart NVIDIA Volta.\nLokalne modele • prywatne repozytorium\nGPL-3.0-or-later. Silnik: ComfyUI (GPL-3.0)."
+                    "Paint.TES 0.2.1\nNatywny edytor dla Ubuntu i kart NVIDIA Volta.\nLokalne modele • prywatne repozytorium\nGPL-3.0-or-later. Silnik: ComfyUI (GPL-3.0)."
                 ),
             ),
             None,
@@ -386,6 +386,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(label)
         layout.addSpacing(10)
         form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.model = QComboBox()
         self.model.setProperty("userContent", True)
         self.model.currentIndexChanged.connect(self.model_changed)
@@ -416,22 +417,33 @@ class MainWindow(QMainWindow):
         self.negative.setMaximumHeight(65)
         layout.addWidget(self.negative)
         form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.reference = QComboBox()
         self.reference.setProperty("userContent", True)
         form.addRow(tr("Karta referencji"), self.reference)
         self.reference.currentIndexChanged.connect(self.update_hint)
-        self.ref_hint = QLabel()
+        self.ref_hint = InfoLabel()
         self.ref_hint.setWordWrap(True)
         self.ref_hint.setObjectName("muted")
         form.addRow(self.ref_hint)
         row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(4)
         self.width = spin(512)
         self.height = spin(512)
-        row.addWidget(self.width)
+        for dimension in (self.width, self.height):
+            dimension.setMinimumWidth(0)
+            dimension.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        row.addWidget(self.width, 1)
         row.addWidget(QLabel("×"))
-        row.addWidget(self.height)
-        form.addRow(QLabel(tr("Nowy obraz (px)")))
-        form.addRow(row)
+        row.addWidget(self.height, 1)
+        self.resolution_label = QLabel(tr("Nowy obraz (px)"))
+        self.resolution_label.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
+        resolution_fields = QWidget()
+        resolution_fields.setLayout(row)
+        form.addRow(self.resolution_label, resolution_fields)
         self.steps = spin(25, 1, 150, 1)
         self.cfg = DecimalSpinBox()
         self.cfg.setRange(0, 30)
@@ -473,9 +485,9 @@ class MainWindow(QMainWindow):
             (tr("Scheduler"), self.scheduler),
         ):
             form.addRow(label, widget)
-        self.strength_hint = QLabel(
+        self.strength_hint = InfoLabel(
             tr(
-                "Siła zmiany działa w trybach image-to-image, inpaint i outpaint. Text-to-image zawsze używa pełnego szumu (1.0)."
+                "Siłę można ustawić w dowolnym trybie. Jest używana w image-to-image, inpaint i outpaint; text-to-image ją pomija (szum 1.0)."
             )
         )
         self.strength_hint.setWordWrap(True)
@@ -505,7 +517,7 @@ class MainWindow(QMainWindow):
         self.progress.setValue(0)
         self.progress.setVisible(False)
         layout.addWidget(self.progress)
-        self.job_status = QLabel(
+        self.job_status = InfoLabel(
             tr("Wyniki powstają w nowych kartach. Zapisujesz je samodzielnie.")
         )
         self.job_status.setWordWrap(True)
@@ -642,7 +654,7 @@ class MainWindow(QMainWindow):
                 "Dla SD/SDXL/MOSS karta referencji może być źródłem image-to-image. Niezależne referencje są dostępne w Qwen 2.1."
             )
         self.ref_hint.setText(text)
-        self.strength.setEnabled(self.mode.currentData() != "txt2img")
+        self.strength.setEnabled(True)
 
     def set_tool(self, tool):
         self.active_tool = tool

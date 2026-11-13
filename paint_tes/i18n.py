@@ -304,7 +304,7 @@ EN.update(
         "{0} · {1} MiB wolne · {2}": "{0} · {1} MiB free · {2}",
         "Zapisano: {0}": "Saved: {0}",
         "Obrazy (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)": "Images (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)",
-        "Paint.TES 0.2.0\nNatywny edytor dla Ubuntu i kart NVIDIA Volta.\nLokalne modele • prywatne repozytorium\nGPL-3.0-or-later. Silnik: ComfyUI (GPL-3.0).": "Paint.TES 0.2.0\nNative image editor for Ubuntu and NVIDIA Volta.\nLocal models • private repository\nGPL-3.0-or-later. Engine: ComfyUI (GPL-3.0).",
+        "Paint.TES 0.2.1\nNatywny edytor dla Ubuntu i kart NVIDIA Volta.\nLokalne modele • prywatne repozytorium\nGPL-3.0-or-later. Silnik: ComfyUI (GPL-3.0).": "Paint.TES 0.2.1\nNative image editor for Ubuntu and NVIDIA Volta.\nLocal models • private repository\nGPL-3.0-or-later. Engine: ComfyUI (GPL-3.0).",
     }
 )
 
@@ -342,3 +342,7 @@ def retranslate_widgets(root):
 
 
 EN["Brak lokalnego pliku ({0}): {1}"] = "Missing local file ({0}): {1}"
+
+EN[
+    "Siłę można ustawić w dowolnym trybie. Jest używana w image-to-image, inpaint i outpaint; text-to-image ją pomija (szum 1.0)."
+] = "You can edit strength in any mode. It applies to image-to-image, inpaint and outpaint. Text-to-image ignores it (noise 1.0)."

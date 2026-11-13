@@ -46,7 +46,7 @@ With the same model, image, prompt and settings, a fixed seed repeats the result
 Changing other settings can change the image even when the seed is fixed.
 
 **Denoising strength** applies to image-to-image, inpaint and outpaint. It is
-disabled for text-to-image, which always uses full noise (1.0). A smaller value
+editable in every mode so it can be preset; text-to-image ignores it and always uses full noise (1.0). A smaller value
 keeps more of the source; a larger one permits a stronger change. Both decimal
 points and commas are accepted (for example `0.35` or `0,35`). With very few
 sampling steps, changes are discrete. PNG metadata includes the actual seed

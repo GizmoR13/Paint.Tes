@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QSizePolicy,
     QSpinBox,
     QTabWidget,
     QVBoxLayout,
@@ -30,6 +31,29 @@ from PySide6.QtWidgets import (
 from .config import FAMILIES, ModelProfile, Settings, data_path, scan_models
 from .hardware import list_gpus
 from .i18n import tr
+
+
+class InfoLabel(QLabel):
+    """Keep all wrapped lines visible inside forms and narrow scroll panels."""
+
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self.setWordWrap(True)
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+    def _fit_height(self):
+        height = self.heightForWidth(max(1, self.contentsRect().width()))
+        if height > 0 and height != self.minimumHeight():
+            self.setFixedHeight(height)
+
+    def setText(self, text):
+        super().setText(text)
+        self._fit_height()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._fit_height()
 
 
 class DecimalSpinBox(QDoubleSpinBox):

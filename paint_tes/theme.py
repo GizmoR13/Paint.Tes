@@ -1,3 +1,5 @@
+from pathlib import Path
+
 STYLE = """
 QMainWindow, QDialog { background: #28211d; color: #eee0ce; }
 QWidget { background-color: #28211d; color: #eee0ce; font-family: 'Noto Sans'; font-size: 13px; }
@@ -14,6 +16,32 @@ QLabel#muted { color: #b7a18c; }
 QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QComboBox, QListWidget {
  background: #211b17; color: #f0e1cc; border: 1px solid #65503e; border-radius: 5px; padding: 6px;
  selection-background-color: #99734e; }
+QSpinBox, QDoubleSpinBox { padding-right: 25px; min-height: 20px; }
+QSpinBox::up-button, QDoubleSpinBox::up-button {
+ subcontrol-origin: border; subcontrol-position: top right; width: 22px; height: 16px;
+ border-left: 1px solid #826044; border-bottom: 1px solid #65503e;
+ border-top-right-radius: 5px; background: #503b2b; }
+QSpinBox::down-button, QDoubleSpinBox::down-button {
+ subcontrol-origin: border; subcontrol-position: bottom right; width: 22px; height: 16px;
+ border-left: 1px solid #826044; border-bottom-right-radius: 5px; background: #503b2b; }
+QSpinBox::up-button:hover, QSpinBox::down-button:hover,
+QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover { background: #805b3c; }
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+ image: url("@CONTROLS@/up.svg"); width: 12px; height: 8px; }
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+ image: url("@CONTROLS@/down.svg"); width: 12px; height: 8px; }
+QSpinBox::up-arrow:disabled, QDoubleSpinBox::up-arrow:disabled {
+ image: url("@CONTROLS@/up-disabled.svg"); }
+QSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:disabled {
+ image: url("@CONTROLS@/down-disabled.svg"); }
+QComboBox { padding-right: 27px; }
+QComboBox::drop-down {
+ subcontrol-origin: border; subcontrol-position: top right; width: 23px;
+ border-left: 1px solid #826044; border-top-right-radius: 5px;
+ border-bottom-right-radius: 5px; background: #503b2b; }
+QComboBox::drop-down:hover { background: #805b3c; }
+QComboBox::down-arrow { image: url("@CONTROLS@/down.svg"); width: 12px; height: 8px; }
+QComboBox::down-arrow:disabled { image: url("@CONTROLS@/down-disabled.svg"); }
 QLineEdit:focus, QTextEdit:focus, QComboBox:focus { border-color: #d4a16b; }
 QPushButton { background: #4b382a; border: 1px solid #826044; border-radius: 6px; padding: 8px 13px; }
 QPushButton:hover { background: #664a33; }
@@ -34,3 +62,7 @@ QProgressBar::chunk { background: #ac8055; }
 QCheckBox { spacing: 8px; }
 QSplitter::handle { background: #3c2e23; }
 """
+
+STYLE = STYLE.replace(
+    "@CONTROLS@", (Path(__file__).resolve().parents[1] / "resources" / "controls").as_posix()
+)

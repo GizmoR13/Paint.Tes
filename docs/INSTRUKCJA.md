@@ -9,7 +9,7 @@ paska mają ikony; nazwy i skróty pojawiają się po najechaniu kursorem.
 Seed to teraz jednoliniowe pole liczbowe (0–9223372036854775807). Puste pole
 losuje seed dla każdego zadania. Ostatnio wysłany seed jest widoczny obok
 przycisku ponownego użycia. Siła zmiany działa w image-to-image, inpaint i
-outpaint; text-to-image zawsze używa 1.0. Możesz wpisać kropkę lub przecinek,
+outpaint. Pole można ustawiać w każdym trybie; text-to-image pomija tę wartość i zawsze używa 1.0. Możesz wpisać kropkę lub przecinek,
 np. `0.35` albo `0,35`. Przy małej liczbie kroków efekty zmieniają się skokowo.
 
 ## Pierwszy start
