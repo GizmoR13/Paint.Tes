@@ -304,7 +304,7 @@ EN.update(
         "{0} · {1} MiB wolne · {2}": "{0} · {1} MiB free · {2}",
         "Zapisano: {0}": "Saved: {0}",
         "Obrazy (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)": "Images (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)",
-        "Paint.TES 0.2.1\nNatywny edytor dla Ubuntu i kart NVIDIA Volta.\nLokalne modele • prywatne repozytorium\nGPL-3.0-or-later. Silnik: ComfyUI (GPL-3.0).": "Paint.TES 0.2.1\nNative image editor for Ubuntu and NVIDIA Volta.\nLocal models • private repository\nGPL-3.0-or-later. Engine: ComfyUI (GPL-3.0).",
+        "Paint.TES 0.3.0\nNatywny edytor dla Ubuntu i kart NVIDIA Volta.\nLokalne modele • prywatne repozytorium\nGPL-3.0-or-later. Silnik: ComfyUI (GPL-3.0).": "Paint.TES 0.3.0\nNative image editor for Ubuntu and NVIDIA Volta.\nLocal models • private repository\nGPL-3.0-or-later. Engine: ComfyUI (GPL-3.0).",
     }
 )
 
@@ -346,3 +346,27 @@ EN["Brak lokalnego pliku ({0}): {1}"] = "Missing local file ({0}): {1}"
 EN[
     "Siłę można ustawić w dowolnym trybie. Jest używana w image-to-image, inpaint i outpaint; text-to-image ją pomija (szum 1.0)."
 ] = "You can edit strength in any mode. It applies to image-to-image, inpaint and outpaint. Text-to-image ignores it (noise 1.0)."
+
+EN.update(
+    {
+        "Ta rodzina modelu wymaga bezpiecznego FP32 na V100. Zmień precyzję w ustawieniach.": "This model family requires safe FP32 on V100. Change precision in Settings.",
+        "Referencja Krea 2 wymaga zgodnej LoRA style-reference. Wybierz ją w profilu albo ustaw referencję na Brak.": "Krea 2 references need a compatible style-reference LoRA. Select it in the profile or set the reference to None.",
+        "Wybierz lokalny model prompt upsamplera FLUX.3 lub wyłącz rozszerzanie promptu.": "Select a local FLUX.3 prompt upsampler or disable prompt expansion.",
+        "FLUX.3 otrzymuje aktywny obraz edycji i niezależną kartę referencji. Wybierz szczegółowy opis sceny lub lokalny prompt upsampler.": "FLUX.3 receives the editing source and an independent reference tab. Use a detailed scene caption or a local prompt upsampler.",
+        "Krea 2: referencja stylu wymaga zgodnej LoRA style-reference w profilu. Bez adaptera możesz użyć aktywnej karty w image-to-image.": "Krea 2 style references need a compatible style-reference LoRA in the profile. Without it, use the active tab for image-to-image.",
+        "Prompt upsampler (opcjonalnie, FLUX.3)": "Prompt upsampler (optional, FLUX.3)",
+        "Rozszerzaj prompt lokalnie przed generowaniem": "Expand prompt locally before generation",
+        "Dla tej rodziny karta referencji może być źródłem image-to-image. Niezależna referencja wymaga modelu, który ją obsługuje.": "For this family, the reference tab can be the image-to-image source. Independent references require a model that supports them.",
+        "SD/SDXL: kompletny checkpoint .safetensors. Inne rodziny: zgodne pliki diffusion, enkodera i VAE zgodnie z opisem profilu. Wybieraj wagi w formacie ComfyUI, np. BF16 lub int8_convrot; nie surowe GGUF, SDNQ ani nieukończone części pobierania.": "SD/SDXL: a complete .safetensors checkpoint. Other families: matching diffusion, encoder and VAE files as described in the profile. Use ComfyUI-format weights such as BF16 or int8_convrot, not raw GGUF, SDNQ or unfinished download parts.",
+    }
+)
+PL.update(
+    {
+        "FLUX.3: Qwen3-VL-4B text encoder + Flux2 VAE. The optional Qwen3.5-9B prompt upsampler is a separate model, not the text encoder. Use a detailed scene caption or enable local prompt expansion.": "FLUX.3: enkoder Qwen3-VL-4B + VAE Flux2. Opcjonalny upsampler Qwen3.5-9B to osobny model, nie enkoder. Użyj szczegółowego opisu sceny lub lokalnego rozszerzania promptu.",
+        "FLUX.3 Base: Qwen3-VL-4B text encoder + Flux2 VAE. Use base weights, not the distilled checkpoint. Prompt expansion is optional and needs its own local model.": "FLUX.3 Base: enkoder Qwen3-VL-4B + VAE Flux2. Wybierz wagi bazowe, nie wariant distilled. Opcjonalne rozszerzanie promptu wymaga osobnego lokalnego modelu.",
+        "Z-Image: Qwen3-4B text encoder (not Qwen3-VL) + the matching Flux/ae.safetensors VAE. Select the base or Turbo family to get the matching sampling defaults.": "Z-Image: enkoder Qwen3-4B (nie Qwen3-VL) + zgodny VAE Flux/ae.safetensors. Wybierz rodzinę bazową lub Turbo, aby ustawić właściwe parametry początkowe.",
+        "Z-Image Turbo: Qwen3-4B text encoder + Flux/ae.safetensors VAE. Start with 8 steps and CFG 1; negative conditioning is unused at CFG 1.": "Z-Image Turbo: enkoder Qwen3-4B + VAE Flux/ae.safetensors. Zacznij od 8 kroków i CFG 1; przy CFG 1 negatywny prompt nie jest używany.",
+        "Krea 2 Raw: Qwen3-VL-4B text encoder + Qwen-Image VAE (not the Qwen-Image 2.1 VAE). A separate style reference requires the matching style-reference LoRA.": "Krea 2 Raw: enkoder Qwen3-VL-4B + VAE Qwen-Image (nie Qwen-Image 2.1). Niezależna referencja stylu wymaga zgodnej LoRA style-reference.",
+        "Krea 2 Turbo: Qwen3-VL-4B text encoder + Qwen-Image VAE. Start with 8 steps and CFG 1. A separate style reference needs a compatible style-reference LoRA.": "Krea 2 Turbo: enkoder Qwen3-VL-4B + VAE Qwen-Image. Zacznij od 8 kroków i CFG 1. Niezależna referencja stylu wymaga zgodnej LoRA style-reference.",
+    }
+)

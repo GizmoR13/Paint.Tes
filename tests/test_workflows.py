@@ -1,10 +1,10 @@
 import pytest
 
-from paint_tes.config import ModelProfile, Settings
+from paint_tes.config import FAMILY_INFO, ModelProfile, Settings
 from paint_tes.workflow import Generation, build_workflow
 
 
-@pytest.mark.parametrize("family", ["sd15", "sdxl", "qwen21", "moss"])
+@pytest.mark.parametrize("family", list(FAMILY_INFO))
 @pytest.mark.parametrize("mode", ["txt2img", "img2img", "inpaint", "outpaint"])
 def test_graphs_for_all_modes_and_families(family, mode):
     request = Generation(mode=mode, width=512, height=512, seed=1)

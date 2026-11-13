@@ -295,7 +295,7 @@ class MainWindow(QMainWindow):
                 self,
                 "Paint.TES",
                 tr(
-                    "Paint.TES 0.2.1\nNatywny edytor dla Ubuntu i kart NVIDIA Volta.\nLokalne modele • prywatne repozytorium\nGPL-3.0-or-later. Silnik: ComfyUI (GPL-3.0)."
+                    "Paint.TES 0.3.0\nNatywny edytor dla Ubuntu i kart NVIDIA Volta.\nLokalne modele • prywatne repozytorium\nGPL-3.0-or-later. Silnik: ComfyUI (GPL-3.0)."
                 ),
             ),
             None,
@@ -632,12 +632,11 @@ class MainWindow(QMainWindow):
         if profile:
             self.settings.active_profile = profile.id
             profile_key = (profile.id, profile.family)
-            if profile.family in ("qwen21", "moss") and profile_key != getattr(
-                self, "_last_profile_key", None
-            ):
-                self.cfg.setValue(4)
-                self.steps.setValue(20)
-                self.scheduler.setCurrentText("simple")
+            if profile_key != getattr(self, "_last_profile_key", None):
+                self.cfg.setValue(profile.info.cfg)
+                self.steps.setValue(profile.info.steps)
+                self.scheduler.setCurrentText(profile.info.scheduler)
+                self.sampler.setCurrentText("euler")
             self._last_profile_key = profile_key
             self.update_hint()
 
@@ -645,13 +644,21 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "ref_hint"):
             return
         profile = self.selected_profile()
-        if profile and profile.family == "qwen21":
+        if profile and profile.info.flux3:
+            text = tr(
+                "FLUX.3 otrzymuje aktywny obraz edycji i niezależną kartę referencji. Wybierz szczegółowy opis sceny lub lokalny prompt upsampler."
+            )
+        elif profile and profile.info.reference_lora:
+            text = tr(
+                "Krea 2: referencja stylu wymaga zgodnej LoRA style-reference w profilu. Bez adaptera możesz użyć aktywnej karty w image-to-image."
+            )
+        elif profile and profile.family == "qwen21":
             text = tr(
                 "Inna karta jest niezależną referencją Qwen. Dla edycji źródłem jest aktywna karta."
             )
         else:
             text = tr(
-                "Dla SD/SDXL/MOSS karta referencji może być źródłem image-to-image. Niezależne referencje są dostępne w Qwen 2.1."
+                "Dla tej rodziny karta referencji może być źródłem image-to-image. Niezależna referencja wymaga modelu, który ją obsługuje."
             )
         self.ref_hint.setText(text)
         self.strength.setEnabled(True)
@@ -970,7 +977,7 @@ class MainWindow(QMainWindow):
                     raise ValueError(tr("Otwórz obraz albo utwórz nową kartę."))
                 doc = canvas.document
                 image = doc.image.copy()
-                if mode == "img2img" and refdoc and profile.family != "qwen21":
+                if mode == "img2img" and refdoc and not profile.info.independent_reference:
                     image = refdoc.image.copy()
                     refdoc = None
                 if mode == "inpaint":
@@ -986,10 +993,10 @@ class MainWindow(QMainWindow):
                         raise ValueError(tr("Dodaj co najmniej jeden margines."))
                     image, mask = expand_canvas(image, *values)
             if refdoc:
-                if profile.family != "qwen21":
+                if not profile.info.independent_reference:
                     raise ValueError(
                         tr(
-                            "Niezależna referencja działa z Qwen 2.1. Dla tego modelu wybierz image-to-image lub ustaw referencję na Brak."
+                            "Ta rodzina nie ma niezależnej referencji. Wybierz image-to-image lub ustaw referencję na Brak."
                         )
                     )
                 reference = refdoc.image.copy()

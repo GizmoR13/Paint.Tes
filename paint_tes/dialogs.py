@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSpinBox,
     QTabWidget,
@@ -28,7 +29,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .config import FAMILIES, ModelProfile, Settings, data_path, scan_models
+from .config import FAMILIES, FAMILY_INFO, ModelProfile, Settings, data_path, scan_models
 from .hardware import list_gpus
 from .i18n import tr
 
@@ -288,11 +289,17 @@ class SettingsDialog(QDialog):
             ("encoder", tr("Enkoder tekstu")),
             ("vae", "VAE"),
             ("lora", tr("LoRA (opcjonalnie)")),
+            ("prompt_upsampler", tr("Prompt upsampler (opcjonalnie, FLUX.3)")),
         ):
             widget, edit = file_field(self)
             self.fields[key] = edit
             self.field_widgets[key] = widget
             right.addRow(label, widget)
+        self.upsample_prompt = QCheckBox(tr("Rozszerzaj prompt lokalnie przed generowaniem"))
+        right.addRow(self.upsample_prompt)
+        self.family_hint = InfoLabel()
+        self.family_hint.setObjectName("muted")
+        right.addRow(self.family_hint)
         self.lora_strength = DecimalSpinBox()
         self.lora_strength.setRange(-3, 3)
         self.lora_strength.setSingleStep(0.05)
@@ -300,18 +307,23 @@ class SettingsDialog(QDialog):
         self.shift.setRange(0.1, 20)
         self.shift.setSingleStep(0.1)
         right.addRow(tr("Siła LoRA"), self.lora_strength)
-        right.addRow("Flow shift (Qwen/MOSS)", self.shift)
+        right.addRow(tr("Flow shift (Qwen/MOSS/Z-Image)"), self.shift)
         scan = QPushButton(tr("Przeglądaj modele w katalogach…"))
         right.addRow(scan)
         desc = QLabel(
             tr(
-                "SD/SDXL: kompletny checkpoint .safetensors.\nQwen/MOSS: trzy zgodne pliki — diffusion, enkoder i VAE.\nSurowe GGUF/GPTQ i SDNQ z ZPix wymagają innych loaderów. Użyj formatu ComfyUI: BF16 lub wag z metadanymi comfy_quant, np. int8_convrot/w4a8."
+                "SD/SDXL: kompletny checkpoint .safetensors. Inne rodziny: zgodne pliki diffusion, enkodera i VAE zgodnie z opisem profilu. Wybieraj wagi w formacie ComfyUI, np. BF16 lub int8_convrot; nie surowe GGUF, SDNQ ani nieukończone części pobierania."
             )
         )
         desc.setWordWrap(True)
         desc.setObjectName("muted")
         right.addRow(desc)
-        ml.addLayout(right, 3)
+        form_body = QWidget()
+        form_body.setLayout(right)
+        form_scroll = QScrollArea()
+        form_scroll.setWidgetResizable(True)
+        form_scroll.setWidget(form_body)
+        ml.addWidget(form_scroll, 3)
         tabs.addTab(models, tr("Modele lokalne"))
         add.clicked.connect(self.add_profile)
         remove.clicked.connect(self.remove_profile)
@@ -361,6 +373,7 @@ class SettingsDialog(QDialog):
             profile.family = self.family.currentData()
             for key, edit in self.fields.items():
                 setattr(profile, key, edit.text().strip())
+            profile.upsample_prompt = self.upsample_prompt.isChecked() and profile.info.flux3
             profile.lora_strength = self.lora_strength.value()
             profile.shift = self.shift.value()
             item = self.profiles.item(self.profile_index)
@@ -389,17 +402,28 @@ class SettingsDialog(QDialog):
         self.family.setCurrentIndex(max(0, self.family.findData(profile.family)))
         for key, edit in self.fields.items():
             edit.setText(getattr(profile, key))
+        self.upsample_prompt.setChecked(profile.upsample_prompt)
         self.lora_strength.setValue(profile.lora_strength)
         self.shift.setValue(profile.shift)
         self.update_family()
 
     def update_family(self):
-        single = self.family.currentData() in ("sd15", "sdxl")
+        family = self.family.currentData()
+        info = FAMILY_INFO[family]
         for key, widget in self.field_widgets.items():
-            widget.setEnabled(
-                key == "lora" or (key == "checkpoint" if single else key != "checkpoint")
-            )
-        self.shift.setEnabled(not single)
+            if key == "prompt_upsampler":
+                widget.setEnabled(info.flux3)
+            else:
+                widget.setEnabled(
+                    key == "lora" or (key != "checkpoint" if info.separate else key == "checkpoint")
+                )
+        self.shift.setEnabled(info.flow_shift is not None)
+        self.upsample_prompt.setEnabled(info.flux3)
+        self.family_hint.setText(tr(info.hint))
+        self.family_hint.setVisible(bool(info.hint))
+        if family != getattr(self, "_last_family", None) and info.flow_shift is not None:
+            self.shift.setValue(info.flow_shift)
+        self._last_family = family
 
     def add_profile(self):
         self.save_profile()

@@ -106,3 +106,7 @@ stacji używa `/mnt/AI/data/paint-tes`. Dziennik: `engine/engine.log` wewnątrz 
 
 Jeżeli model zgłasza nieobsługiwany typ wag, wybierz wariant zgodny z dołączonym
 silnikiem. Nie aktualizuj automatycznie PyTorch do CUDA 13; V100 wymaga sm_70.
+
+## FLUX.3 / Z-Image / Krea 2 — 0.3
+
+[Local components, variants and defaults / komponenty i parametry](MODELS.md).

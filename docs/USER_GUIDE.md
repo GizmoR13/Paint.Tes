@@ -89,3 +89,7 @@ For upgrade compatibility, the existing `Paint.Tes` configuration/data directory
 names are retained. Local workstation data remains under `/mnt/AI/data/paint-tes`;
 its engine log is `engine/engine.log`. The application is now displayed as
 **Paint.TES** in the window and Ubuntu application menu.
+
+## FLUX.3 / Z-Image / Krea 2 — 0.3
+
+[Local components, variants and defaults / komponenty i parametry](MODELS.md).

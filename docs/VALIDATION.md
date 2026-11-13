@@ -62,3 +62,22 @@ ComfyUI, sterownika, ustawień zasilania ani działających silników LLM.
 - Strength jest edytowalny również w text-to-image, aby można go było ustawić
   z wyprzedzeniem. Sampler txt2img nadal używa 1.0; edycja używa wpisanej wartości.
 - Obejrzano zrzut pełnego panelu z polami i nieuciętymi informacjami.
+
+## Nowe rodziny 0.3 — 2026-11-13
+
+- 89 testów przeszło; 2 testy GPU są opt-in. Ruff: bez błędów.
+- Osobno test schematów w przypiętym ComfyUI na V100: 30 grafów dla sześciu
+  nowych wariantów, w tym cztery tryby, referencje i lokalny upsampler FLUX.3.
+  Sprawdzono rzeczywiste nazwy/typy wejść, połączenia, rozmiary latentów oraz
+  wykonanie ReferenceLatent na małych tensorach. Test nie ładuje trenowanych wag.
+- Domyślne parametry, zapis/odczyt profili, aktywacja pól, wymagane komponenty,
+  rozdzielenie enkodera i upsamplera, natywne harmonogramy FLUX/Krea oraz LoRA
+  referencji Krea są objęte testami aplikacji.
+- Pełna generacja FLUX.3, Z-Image i Krea 2 pozostaje niezweryfikowana: brak
+  kompletnego zestawu wag lokalnie. Części pobierania FLUX.3 pozostały nietknięte.
+  Nie pobierano modeli ani nie aktualizowano silnika, sterownika i zależności.
+
+Test schematów (bez trenowanych wag):
+```bash
+PAINT_TES_GPU_TESTS=1 QT_QPA_PLATFORM=offscreen ../.venv/bin/python -m pytest -q tests/test_engine_schemas_optional.py
+```

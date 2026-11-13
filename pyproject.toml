@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "paint-tes"
-version = "0.2.1"
+version = "0.3.0"
 description = "Local Ubuntu image editor for NVIDIA Volta workstations"
 requires-python = ">=3.12,<3.13"
 license = "GPL-3.0-or-later"

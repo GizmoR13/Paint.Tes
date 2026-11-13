@@ -8,12 +8,104 @@ from uuid import uuid4
 
 from .i18n import tr
 
-FAMILIES = {
-    "sd15": "Stable Diffusion 1.5",
-    "sdxl": "SDXL",
-    "qwen21": "Qwen-Image 2.1",
-    "moss": "MOSS-Image",
+
+@dataclass(frozen=True)
+class FamilyInfo:
+    label: str
+    clip_type: str = ""
+    latent_node: str = "EmptyLatentImage"
+    flow_shift: float | None = None
+    steps: int = 25
+    cfg: float = 7.0
+    scheduler: str = "normal"
+    independent_reference: bool = False
+    reference_lora: bool = False
+    hint: str = ""
+
+    @property
+    def separate(self):
+        return bool(self.clip_type)
+
+    @property
+    def flux3(self):
+        return self.clip_type == "flux3"
+
+
+FAMILY_INFO = {
+    "sd15": FamilyInfo("Stable Diffusion 1.5"),
+    "sdxl": FamilyInfo("SDXL"),
+    "qwen21": FamilyInfo(
+        "Qwen-Image 2.1", "qwen_image", "PaintTesEmptyQwen21Latent", 3.0, 20, 4, "simple", True
+    ),
+    "moss": FamilyInfo("MOSS-Image", "moss_image", "EmptyFlux2LatentImage", 5.0, 20, 4, "simple"),
+    "flux3": FamilyInfo(
+        "FLUX.3 Image Klein",
+        "flux3",
+        "EmptyFlux2LatentImage",
+        None,
+        16,
+        1,
+        "simple",
+        True,
+        hint="FLUX.3: Qwen3-VL-4B text encoder + Flux2 VAE. The optional Qwen3.5-9B prompt upsampler is a separate model, not the text encoder. Use a detailed scene caption or enable local prompt expansion.",
+    ),
+    "flux3_base": FamilyInfo(
+        "FLUX.3 Image Klein Base",
+        "flux3",
+        "EmptyFlux2LatentImage",
+        None,
+        50,
+        3.5,
+        "simple",
+        True,
+        hint="FLUX.3 Base: Qwen3-VL-4B text encoder + Flux2 VAE. Use base weights, not the distilled checkpoint. Prompt expansion is optional and needs its own local model.",
+    ),
+    "zimage": FamilyInfo(
+        "Z-Image",
+        "lumina2",
+        "EmptySD3LatentImage",
+        3.0,
+        28,
+        4,
+        "simple",
+        hint="Z-Image: Qwen3-4B text encoder (not Qwen3-VL) + the matching Flux/ae.safetensors VAE. Select the base or Turbo family to get the matching sampling defaults.",
+    ),
+    "zimage_turbo": FamilyInfo(
+        "Z-Image Turbo",
+        "lumina2",
+        "EmptySD3LatentImage",
+        3.0,
+        8,
+        1,
+        "simple",
+        hint="Z-Image Turbo: Qwen3-4B text encoder + Flux/ae.safetensors VAE. Start with 8 steps and CFG 1; negative conditioning is unused at CFG 1.",
+    ),
+    "krea2": FamilyInfo(
+        "Krea 2 Raw",
+        "krea2",
+        "EmptySD3LatentImage",
+        None,
+        52,
+        3.5,
+        "simple",
+        True,
+        True,
+        hint="Krea 2 Raw: Qwen3-VL-4B text encoder + Qwen-Image VAE (not the Qwen-Image 2.1 VAE). A separate style reference requires the matching style-reference LoRA.",
+    ),
+    "krea2_turbo": FamilyInfo(
+        "Krea 2 Turbo",
+        "krea2",
+        "EmptySD3LatentImage",
+        None,
+        8,
+        1,
+        "simple",
+        True,
+        True,
+        hint="Krea 2 Turbo: Qwen3-VL-4B text encoder + Qwen-Image VAE. Start with 8 steps and CFG 1. A separate style reference needs a compatible style-reference LoRA.",
+    ),
 }
+FAMILIES = {key: info.label for key, info in FAMILY_INFO.items()}
 
 
 def config_path() -> Path:
@@ -41,9 +133,17 @@ class ModelProfile:
     encoder: str = ""
     vae: str = ""
     lora: str = ""
+    prompt_upsampler: str = ""
+    upsample_prompt: bool = False
     lora_strength: float = 1.0
     shift: float = 3.0
     id: str = field(default_factory=lambda: uuid4().hex)
+
+    @property
+    def info(self) -> FamilyInfo:
+        if self.family not in FAMILY_INFO:
+            raise ValueError(tr("Nieznana rodzina modelu."))
+        return FAMILY_INFO[self.family]
 
     def validate(self) -> None:
         if self.family not in FAMILIES:
@@ -51,7 +151,10 @@ class ModelProfile:
         required = (
             ("checkpoint",) if self.family in ("sd15", "sdxl") else ("diffusion", "encoder", "vae")
         )
-        for key in (*required, *(["lora"] if self.lora else [])):
+        extra = ["lora"] if self.lora else []
+        if self.info.flux3 and self.upsample_prompt:
+            extra.append("prompt_upsampler")
+        for key in (*required, *extra):
             path = Path(getattr(self, key)).expanduser()
             if not getattr(self, key) or not path.is_file():
                 raise ValueError(

@@ -76,7 +76,13 @@ class EngineClient:
             "encoder": "text_encoders",
             "vae": "vae",
             "lora": "loras",
+            "prompt_upsampler": "text_encoders",
         }
+        active = {"diffusion", "encoder", "vae"} if profile.info.separate else {"checkpoint"}
+        if profile.lora:
+            active.add("lora")
+        if profile.info.flux3 and profile.upsample_prompt:
+            active.add("prompt_upsampler")
         names = {}
         folders = {}
         for key, category in keys.items():
@@ -84,7 +90,7 @@ class EngineClient:
             folder.mkdir(parents=True, exist_ok=True)
             folders[category] = str(folder)
             value = getattr(profile, key)
-            if value:
+            if key in active and value:
                 path = Path(value).expanduser().resolve(strict=True)
                 name = hashlib.sha256(str(path).encode()).hexdigest()[:16] + "-" + path.name
                 link = folder / name
@@ -192,10 +198,10 @@ class EngineClient:
     ):
         self.prompt_id = None
         names, paths_file = self.register_models(profile)
-        if settings.precision == "fp16" and profile.family in ("qwen21", "moss"):
+        if settings.precision == "fp16" and profile.info.separate:
             raise ValueError(
                 tr(
-                    "Qwen/MOSS wymaga trybu bezpiecznego FP32 na V100. Zmień precyzję w ustawieniach."
+                    "Ta rodzina modelu wymaga bezpiecznego FP32 na V100. Zmień precyzję w ustawieniach."
                 )
             )
         self.ensure_server(settings, paths_file, report)
