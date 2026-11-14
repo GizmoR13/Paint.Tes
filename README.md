@@ -1,42 +1,58 @@
 # Paint.TES
 
-Natywny edytor obrazu dla rodziny Ubuntu, z kawowym interfejsem i lokalną generacją
-na NVIDIA V100/V100S/TITAN V (Volta, sm_70). Układ pracy inspirowany edytorami typu
-Paint.NET: narzędzia po lewej, dokumenty w kartach i panel AI po prawej.
+A native image editor for Ubuntu and derivatives, with local AI generation on
+NVIDIA V100, V100S and TITAN V GPUs. Paint.TES combines a Paint.NET-inspired
+workspace, a coffee-colored theme and an integrated AI panel.
 
-![Paint.Tes — natywne okno z obrazem wygenerowanym lokalnie na V100](docs/screens/paint-tes.png)
+![Paint.TES running with an image generated locally on V100](docs/screens/paint-tes.png)
 
-## Version 0.3 — FLUX.3 / Z-Image / Krea 2
+## Features
 
-English is now the default UI language. Switch immediately in
-**Settings → General → Language**. Both toolbars use icons with localized
-tooltips. Seed is an exact integer input with last-seed reuse; denoising strength
-accepts either decimal separator and applies to editing modes.
+- Text to image, image to image, inpainting and outpainting.
+- Tabbed documents, with AI results opening in separate tabs.
+- Reference images from other tabs, including independent references for
+  Qwen-Image 2.1 and FLUX.3, and style references for Krea 2 with a compatible LoRA.
+- Rectangle, ellipse, lasso and polygon selections, mask inversion and feathering.
+- Brush, eraser, clipboard, crop, rotation, resizing and undo.
+- Background removal to transparent PNG using a local ONNX model.
+- Named model profiles with local file selection and optional LoRA.
+- Exact integer seeds, last-seed reuse and adjustable denoising strength for editing.
+- English and Polish interfaces, with English as the default.
 
-[English user guide](docs/USER_GUIDE.md) · [Instrukcja po polsku](docs/INSTRUKCJA.md)
+Model weights stay on your disk. Generation runs locally without a cloud account
+or API key. Paint.TES does not download model weights.
 
-## Funkcje
+## Model families
 
-- Text to image, image to image, inpaint i outpaint.
-- Osobne karty obrazów; wyniki AI zawsze otwierane jako nowe dokumenty.
-- Referencja z innej karty: niezależna referencja w Qwen-Image 2.1 i FLUX.3, styl w Krea 2 przez zgodną LoRA; dla pozostałych
-  rodzin karta referencji może być źródłem image to image.
-- Prostokąt, elipsa, lasso, wielokąt, odwracanie i zmiękczanie maski.
-- Pędzel, gumka, schowek, kadrowanie, obrót, zmiana rozmiaru i cofanie zmian.
-- Usuwanie tła do przezroczystego PNG z lokalnego modelu ONNX.
-- Profile lokalnych checkpointów SD 1.5/SDXL i zestawów Qwen-Image 2.1/MOSS, FLUX.3, Z-Image i Krea 2.
-- Wybór karty według UUID, kontrola precyzji, pamięci i katalogów w ustawieniach.
+| Family | Local components |
+|---|---|
+| Stable Diffusion 1.5 / SDXL | Complete base `.safetensors` checkpoint with text encoder and VAE |
+| Qwen-Image 2.1 | Diffusion model, matching Qwen3-VL encoder and VAE |
+| MOSS-Image | Diffusion model, matching Qwen3.5 encoder and Flux2 VAE |
+| FLUX.3 Image Klein / Base | Diffusion model, Qwen3-VL-4B encoder and Flux2 VAE |
+| Z-Image / Turbo | Diffusion model, Qwen3-4B encoder and Flux VAE |
+| Krea 2 Raw / Turbo | Diffusion model, Qwen3-VL-4B encoder and original Qwen-Image VAE |
+| Background removal | Local U2Net, ISNet or BiRefNet ONNX model |
 
-**Modele wybierasz z dysku. Program nie pobiera wag ani nie wymaga konta/API.**
+FLUX.3 also supports an optional local Qwen3.5-9B prompt upsampler. Krea 2 style
+references require a compatible style-reference LoRA.
 
-## Instalacja na Ubuntu 24.04 / pochodnych, x86_64
+Use ComfyUI-native `.safetensors` components or supported quantizations with
+ComfyUI metadata. Raw GGUF, SDNQ, generic GPTQ, Diffusers directories and unfinished
+downloads are not supported. Masked editing uses base models rather than dedicated
+inpainting checkpoints with additional input channels.
 
-Wymagane: działający proprietary sterownik NVIDIA wspierający Volta i CUDA 12.6,
-Python 3.12 (instalator `uv` może go dostarczyć), Git i [uv](https://docs.astral.sh/uv/getting-started/installation/).
-Na Ubuntu wymagane biblioteki Qt są zwykle już dostępne; jeśli Qt zgłasza brak
-platformy `xcb`, sprawdź systemowe `libxkbcommon-x11-0` i `libegl1`. Brakujące
-`libxcb-cursor0` instalator rozpakowuje we własnym `../qt-runtime`, bez sudo.
-Nie wymieniaj sterownika GPU dla tej aplikacji.
+See [model components and defaults](docs/MODELS.md) for details.
+
+## Requirements
+
+- Ubuntu 24.04 or a compatible derivative, x86_64.
+- NVIDIA V100, V100S or TITAN V with Volta `sm_70` support.
+- A working proprietary NVIDIA driver compatible with CUDA 12.6 and Volta.
+- Python 3.12, Git and [uv](https://docs.astral.sh/uv/getting-started/installation/).
+- Compatible local model weights and sufficient RAM, VRAM and disk space.
+
+## Installation
 
 ```bash
 git clone --recurse-submodules https://github.com/GizmoR13/Paint.Tes.git
@@ -46,67 +62,49 @@ cd Paint.Tes
 ./start.sh
 ```
 
-Instalator tworzy osobne `../.venv`, obok repozytorium. Nie wskazuj środowiska
-innej aplikacji. Opcjonalne nadpisanie: `PAINT_TES_VENV=/pełna/ścieżka`.
-Zależności są ograniczone do przetestowanego zestawu (`constraints-tested.txt`).
-PyTorch 2.11.0 i torchvision 0.26.0 są przypięte do CUDA 12.6, z obsługą sm_70.
-Instalacja pobiera biblioteki programu, **nie modele**. Kolejne uruchomienia nie
-wywołują instalatora ani aktualizacji zależności.
+The installer creates an isolated `../.venv` next to the repository. Dependencies
+are pinned in `constraints-tested.txt`, including PyTorch 2.11.0 and torchvision
+0.26.0 with CUDA 12.6 and `sm_70` support. Set `PAINT_TES_VENV` to override the
+virtual environment path.
 
-## Modele
+Qt requires the usual Ubuntu desktop libraries, including `libxkbcommon-x11-0`
+and `libegl1`. If `libxcb-cursor0` is missing, the installer extracts it into a
+private `../qt-runtime` directory without sudo.
 
-W **Ustawienia → Modele lokalne** dodaj nazwany profil:
+## Getting started
 
-| Rodzina | Wymagane lokalne pliki |
-|---|---|
-| SD 1.5 / SDXL | kompletny bazowy checkpoint `.safetensors` z enkoderem i VAE |
-| Qwen-Image 2.1 | diffusion / transformer, zgodny enkoder Qwen3-VL i VAE |
-| MOSS-Image | diffusion / transformer, zgodny enkoder Qwen3.5 i VAE Flux2 |
-| FLUX.3 Klein / Base | diffusion, Qwen3-VL-4B, Flux2 VAE; opcjonalnie osobny prompt upsampler |
-| Z-Image / Turbo | diffusion, Qwen3-4B (bez VL), Flux VAE |
-| Krea 2 Raw / Turbo | diffusion, Qwen3-VL-4B, VAE Qwen-Image (nie 2.1) |
-| Usuwanie tła | ONNX U2Net/ISNet/BiRefNet, skonfigurowany oddzielnie |
+1. Open **Settings → Local models**, add a profile and select its local files.
+2. Choose your Volta GPU and model/output directories in **Settings → General**.
+3. Select the model profile and generation mode in the AI panel.
+4. Create or open an image, enter a prompt and generate. Use a selection for
+   inpainting, or expand the canvas for outpainting.
+5. Save the results you want to keep.
 
-Formaty osobnych komponentów: natywne wagi ComfyUI, BF16 albo obsługiwana
-kwantyzacja z metadanymi `comfy_quant` (np. int8_convrot/w4a8). Surowe GGUF,
-GPTQ bez metadanych ComfyUI, SDNQ z ZPix i katalogi Diffusers nie są obsługiwane
-przez ten loader. Samo rozszerzenie `.safetensors` nie gwarantuje zgodności
-architektury i wariantu kwantyzacji. Opcjonalna LoRA musi pasować do modelu.
-Specjalistyczne checkpointy inpaint wymagające dodatkowych kanałów nie są celem
-pierwszej wersji; maskowane edycje korzystają z bazowych modeli.
+Switch the interface language in **Settings → General → Language**. Configure
+background removal separately by selecting a local ONNX model in Settings.
 
-Nowe rodziny: [wymagane komponenty i parametry](docs/MODELS.md).
+[English user guide](docs/USER_GUIDE.md) · [Polish user guide](docs/INSTRUKCJA.md)
 
-Szczegóły obsługi: [Instrukcja](docs/INSTRUKCJA.md).
+## Local engine
 
-## Silnik V100
+The PySide6 interface uses a pinned [ComfyUI](https://github.com/Comfy-Org/ComfyUI)
+submodule. The engine starts on demand in a private process on a loopback port,
+independently of other ComfyUI installations.
 
-GUI jest napisane w PySide6. Silnik to przypięty ComfyUI jako podmoduł Git;
-uruchamia się w prywatnym procesie na losowym porcie loopback dopiero przy
-pierwszym zadaniu. Nie korzysta z istniejącej usługi ComfyUI i jej nie zmienia.
-Proces sprawdza CUDA 12.x, sm_70 i wybraną kartę, zanim może załadować model.
+The Volta execution path uses safe FP32 precision, math SDPA and standard memory
+offloading. FP16 is optional for SD/SDXL. GPU selection uses UUIDs; multiple cards
+do not automatically combine their memory.
 
-Na Volcie używa math SDPA, FP32 w trybie bezpiecznym, standardowego offloadu
-zamiast dynamicznego VRAM oraz enkodera na GPU z możliwością offloadu do RAM.
-FP16 jest opcjonalny dla SD/SDXL. Rodziny z osobnymi komponentami wymagają trybu bezpiecznego, aby nie
-ryzykować przepełnień BF16→FP16. Dwie karty nie łączą automatycznie pamięci.
+## Validation
 
-## Walidacja i ograniczenia
+The application has 89 passing automated tests. An additional check validates
+30 workflows against the pinned ComfyUI engine on V100, including latent shapes
+and reference conditioning. Real generation has been tested with Qwen-Image 2.1
+and MOSS-Image. Full generation with FLUX.3, Z-Image, Krea 2 and SD/SDXL remains
+unverified; workflow validation alone does not verify model weights or output
+quality. See the [validation report](docs/VALIDATION.md) for scope and limitations.
 
-Zobacz [raport testów](docs/VALIDATION.md). Ta wersja jest pierwszą wersją roboczą.
-Duże rozdzielczości, warianty wag i LoRA wymagają testów na konkretnym sprzęcie.
-Brak lokalnego modelu ONNX oznacza, że przed usunięciem tła trzeba go wskazać.
-Program nigdy nie pobierze go automatycznie.
+## License
 
-```bash
-uv pip install --python ../.venv/bin/python pytest pytest-qt onnx ruff
-QT_QPA_PLATFORM=offscreen ../.venv/bin/python -m pytest -q tests
-# Opcjonalny test małego modelu ONNX na V100:
-PAINT_TES_GPU_TESTS=1 QT_QPA_PLATFORM=offscreen ../.venv/bin/python -m pytest -q tests/test_gpu_optional.py
-```
-
-## Licencja
-
-GPL-3.0-or-later. [ComfyUI](https://github.com/Comfy-Org/ComfyUI) jest podmodułem
-na własnej licencji GPL-3.0; zachowano jego prawa autorskie. Paint.Tes nie zawiera
-kodu ani zasobów Paint.NET. PySide6/Qt i pozostałe biblioteki zachowują swoje licencje.
+GPL-3.0-or-later. ComfyUI, PySide6/Qt and other dependencies retain their respective
+licenses. Paint.TES contains no Paint.NET code or assets.
